@@ -8,10 +8,12 @@ import json
 import os
 from pathlib import Path
 import secrets
+import subprocess
 import sys
 import tempfile
 import threading
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -28,6 +30,29 @@ class PrivateStorageTests(unittest.TestCase):
                 assert_private_file(target)
                 self.assertEqual(json.loads(target.read_text(encoding='utf-8')), value)
             self.assertEqual([p.name for p in Path(directory).iterdir()], [target.name])
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows ACL regression')
+    def test_explicit_unrelated_ace_is_removed_before_secret_bytes(self):
+        original = tempfile.mkstemp
+        with tempfile.TemporaryDirectory(prefix='structboard-acl-fixture-') as directory:
+            target = Path(directory) / 'synthetic-state.json'
+            def broad_temporary(*args, **kwargs):
+                fd, name = original(*args, **kwargs)
+                try:
+                    subprocess.run(['icacls', name, '/grant', '*S-1-1-0:R'],
+                                   check=True, capture_output=True, creationflags=0x08000000)
+                    self.assertEqual(Path(name).read_bytes(), b'')
+                    with self.assertRaises(OSError):
+                        assert_private_file(name)
+                    return fd, name
+                except BaseException:
+                    os.close(fd)
+                    Path(name).unlink(missing_ok=True)
+                    raise
+            with patch('harness_broker.tempfile.mkstemp', side_effect=broad_temporary):
+                atomic_json(target, {'fixture': True}, private=True)
+            assert_private_file(target)
+            self.assertEqual(json.loads(target.read_text()), {'fixture': True})
 
 
 class Clock:

@@ -260,6 +260,43 @@ def assert_private_file(path):
         raise OSError("Credential/grant file must be owned by this user with mode 0600")
 
 
+def _windows_restrict_file(path):
+    """Replace the new file's entire DACL before writing credentials.
+
+    Removing inherited ACEs and granting the owner does not remove unrelated
+    explicit ACEs on a temporary file. Use one protected, owner-only DACL.
+    """
+    from ctypes import wintypes
+    advapi = ctypes.WinDLL("advapi32", use_last_error=True)
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    convert = advapi.ConvertStringSecurityDescriptorToSecurityDescriptorW
+    convert.argtypes = [wintypes.LPCWSTR, wintypes.DWORD,
+                        ctypes.POINTER(ctypes.c_void_p), ctypes.c_void_p]
+    convert.restype = wintypes.BOOL
+    get_dacl = advapi.GetSecurityDescriptorDacl
+    get_dacl.argtypes = [ctypes.c_void_p, ctypes.POINTER(wintypes.BOOL),
+                        ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(wintypes.BOOL)]
+    get_dacl.restype = wintypes.BOOL
+    set_security = advapi.SetNamedSecurityInfoW
+    set_security.argtypes = [wintypes.LPWSTR, ctypes.c_int, wintypes.DWORD,
+                            ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+    set_security.restype = wintypes.DWORD
+    kernel.LocalFree.argtypes = [ctypes.c_void_p]
+    kernel.LocalFree.restype = ctypes.c_void_p
+    descriptor = ctypes.c_void_p()
+    sddl = "D:P(A;;FA;;;%s)" % _windows_sid()
+    if not convert(sddl, 1, ctypes.byref(descriptor), None):
+        raise OSError("Unable to create private credential ACL")
+    try:
+        present, defaulted, dacl = wintypes.BOOL(), wintypes.BOOL(), ctypes.c_void_p()
+        if not get_dacl(descriptor, ctypes.byref(present), ctypes.byref(dacl), ctypes.byref(defaulted)) or not present or not dacl:
+            raise OSError("Unable to create private credential DACL")
+        if set_security(str(path), 1, 4 | 0x80000000, None, None, dacl, None):
+            raise OSError("Unable to restrict credential permissions")
+    finally:
+        kernel.LocalFree(descriptor)
+
+
 def atomic_json(path, value, private=False):
     """Create an owner-only temporary file before writing any secret bytes."""
     path = Path(path)
@@ -269,9 +306,7 @@ def atomic_json(path, value, private=False):
     try:
         if private:
             if os.name == "nt":
-                sid = _windows_sid()
-                subprocess.run(["icacls", str(temporary), "/inheritance:r", "/grant:r", "*%s:F" % sid],
-                               check=True, capture_output=True, creationflags=0x08000000)
+                _windows_restrict_file(temporary)
                 assert_private_file(temporary)
             else:
                 os.fchmod(fd, 0o600)
