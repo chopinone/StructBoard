@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="构境 StructBoard：面向 AI 蛋白设计的本地结构工作台。30 秒了解路线地图、多模型比较、分屏检阅和 AI 接入。">
+  <title>构境 StructBoard · 让蛋白设计，看清下一步</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;color:#16253d;background:#f7f9fc;font:16px/1.7 system-ui,"Microsoft YaHei",sans-serif}
+    a{color:#1269ec;text-decoration:none}main{max-width:1160px;padding:28px 24px 64px;margin:auto}
+    nav{display:flex;justify-content:space-between;gap:20px;align-items:center}nav strong{font-size:19px}nav div{display:flex;gap:22px}
+    header{text-align:center;margin:56px 0 30px}header p{color:#596d88;margin:12px auto;max-width:760px}h1{font-size:clamp(30px,5vw,52px);line-height:1.25;letter-spacing:-1px;margin:0}
+    .eyebrow{color:#1269ec;font-size:13px;letter-spacing:2px;font-weight:650;margin-bottom:14px}.video{background:white;border:1px solid #dce4ef;border-radius:18px;padding:10px;box-shadow:0 14px 40px #15305a0c}
+    video{display:block;width:100%;aspect-ratio:16/9;object-fit:contain;background:white;border-radius:10px}.video p{margin:8px 8px 3px;color:#65738a;font-size:13px}
+    .actions{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin:26px 0 48px}.button{padding:10px 20px;border-radius:10px;background:#1269ec;color:white;font-weight:600}.button.secondary{background:white;color:#1269ec;border:1px solid #cfdef4}
+    section{margin-top:44px}h2{font-size:24px;margin:0 0 10px}section p{margin:0 0 18px;color:#596d88}.shot{width:100%;height:auto;display:block;border:1px solid #dce4ef;border-radius:12px}
+    footer{margin-top:48px;border-top:1px solid #dce4ef;padding-top:20px;font-size:13px;color:#65738a}
+    @media(max-width:600px){main{padding:20px 14px 40px}header{margin:36px 0 24px}nav div{gap:12px;font-size:14px}.video{padding:5px}.actions{margin-bottom:32px}}
+  </style>
+</head>
+<body><main>
+  <nav><strong>构境 <span style="color:#1269ec">StructBoard</span></strong><div><a href="https://github.com/chopinone/StructBoard">GitHub</a><a href="https://github.com/chopinone/StructBoard/releases/latest">下载</a></div></nav>
+  <header><div class="eyebrow">AI PROTEIN DESIGN</div><h1>让蛋白设计，看清下一步。</h1><p>把设计路线、候选模型与筛选依据放在一个工作台。<br>从全局路线到结构细节，自由浏览、比较与检阅。</p></header>
+  <div class="video"><video controls playsinline preload="metadata" poster="images/model-comparison.png" aria-label="构境 30 秒中文配音介绍"><source src="media/structboard-demo.mp4" type="video/mp4">浏览器不支持视频播放，可<a href="media/structboard-demo.mp4">打开完整视频</a>。</video><p>30 秒 · 白色界面实录 · 中文配音 · 点击播放</p></div>
+  <div class="actions"><a class="button" href="https://github.com/chopinone/StructBoard/releases/latest">下载 Windows 版</a><a class="button secondary" href="https://github.com/chopinone/StructBoard">查看开源项目</a></div>
+  <section><h2>一眼把握设计路线</h2><p>节点和连线自由调整，也可一键自动整理。查看生成、预测、筛选与复核如何衔接。</p><img class="shot" src="images/route-map.png" alt="完整路线地图" loading="lazy" width="1600" height="900"></section>
+  <section><h2>多个候选，放在一起比较</h2><p>结构对齐、视角联动，按候选排列或逐个平铺。</p><img class="shot" src="images/model-comparison.png" alt="两组候选十个模型并排比较" loading="lazy" width="1600" height="900"></section>
+  <section><h2>一边浏览，一边检阅</h2><p>左侧查看总览，右侧比较结构。管线独立分标签，也能拆成多个窗口。</p><img class="shot" src="images/split-view.png" alt="总览与检阅台分屏" loading="lazy" width="1600" height="900"></section>
+  <section><h2>让 AI 读懂当前工作区</h2><p>MCP 按授权连接客户端。内置助手继续追查、折叠过程，优先给出简短结论；修改数据需确认。</p><img class="shot" src="images/ai-connection.png" alt="演示助手连接状态" loading="lazy" width="1600" height="900"></section>
+  <footer>© 2026 chopinone · GPL-3.0-only · Windows 10/11 x64<br>画面为虚构 NOVA 管线及公开示例结构，不代表实验或预测结果。<a href="https://github.com/chopinone/StructBoard/blob/main/docs/MEDIA.md">素材说明</a></footer>
+</main></body></html>

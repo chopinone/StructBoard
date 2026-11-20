@@ -7,3 +7,4 @@
 *.cmd text eol=crlf
 *.bat text eol=crlf
 *.gif binary
+*.mp4 binary

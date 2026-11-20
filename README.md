@@ -4,11 +4,11 @@
 
 面向 AI 蛋白设计与药物研发的本地结构工作台。把生成、预测、筛选和复核串成路线图，在同一个窗口里查看候选、比较模型、记录判断，并通过 MCP 连接 AI 客户端。
 
-[下载 Windows 安装版](https://github.com/chopinone/StructBoard/releases/latest) · [观看 30 秒演示](https://github.com/chopinone/StructBoard/releases/download/v0.3.0/StructBoard-demo-30s.mp4) · [从源码构建](#从源码构建)
+[下载 Windows 安装版](https://github.com/chopinone/StructBoard/releases/latest) · [观看 30 秒演示](https://chopinone.github.io/StructBoard/) · [从源码构建](#从源码构建)
 
-[![白色界面动态预览：结构联动与候选排列，点击观看完整视频](docs/images/demo-preview.gif)](https://github.com/chopinone/StructBoard/releases/download/v0.3.0/StructBoard-demo-30s.mp4)
+[![白色界面动态预览：结构联动与候选排列，点击观看完整视频](docs/images/demo-preview.gif)](https://chopinone.github.io/StructBoard/)
 
-*上方为无声片段；点击观看带中文配音的 30 秒完整视频。画面使用虚构的 NOVA 管线与公开示例结构，不包含个人研究数据。*
+*上方为无声片段；点击进入介绍页，直接播放带中文配音的 30 秒完整视频。画面使用虚构的 NOVA 管线与公开示例结构，不包含个人研究数据。*
 
 ## 一眼看懂设计路线
 

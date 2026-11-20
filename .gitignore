@@ -71,3 +71,6 @@ access.json
 workspace*.json
 session*.json
 candidate-provenance.json
+
+# Audited promotional video only.
+!/docs/media/structboard-demo.mp4

@@ -67,9 +67,9 @@ def audit(root, all_files=False):
         if name in data.get('reviewedAssets', {}):
             asset_bytes = raw.replace(b'\r\n', b'\n') if path.suffix.lower() == '.svg' else raw
             if hashlib.sha256(asset_bytes).hexdigest() != data['reviewedAssets'][name]:
-                issues.append(name + ': changed image needs privacy review')
-        elif path.suffix.lower() in {'.png', '.ico', '.svg', '.jpg', '.webp'}:
-            issues.append(name + ': image has not been reviewed')
+                issues.append(name + ': changed media needs privacy review')
+        elif path.suffix.lower() in {'.png', '.ico', '.svg', '.jpg', '.webp', '.gif', '.mp4'}:
+            issues.append(name + ': media has not been reviewed')
         if b'\0' in raw[:8192]:
             if name not in data.get('reviewedAssets', {}):
                 issues.append(name + ': unreviewed binary')

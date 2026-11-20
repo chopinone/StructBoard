@@ -76,6 +76,10 @@ CONTRACT = {
     # not a dependency graph. Literal loaders are checked as well as this known edge.
     "dynamic_references": {"ai_chat.js": ["ai_logo.png"]},
     "approved_new_support": [
+        "docs/index.html",
+        "docs/.nojekyll",
+        "docs/media/structboard-demo.mp4",
+
         "CHANGELOG.md",
         "docs/MEDIA.md",
         "docs/images/ai-connection.png",
