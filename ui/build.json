@@ -8,7 +8,7 @@
     "frontend/canvas/route-geometry.mjs": "0011cc2cccfd8e8e1c39d9df0c3ade8180cd96ae1e8220bc0093751847abc643",
     "frontend/canvas/runtime.mjs": "8301c1af9f99ed85f12248d7e51959a29809679b29c1f89532a9f4c99d1d1d09",
     "frontend/components/AssistantPanel.vue": "15dbd8214efa7a3cfa3826e00849a69fe6f117faf08b79b7fd4ddc9bb227b7fb",
-    "frontend/components/AssistantSettings.vue": "46234ee132c336c7c333d05e06a34fb75e4bcf4fe3bdc2b4a21b6bf8213e544f",
+    "frontend/components/AssistantSettings.vue": "197eeb11ce899819977b01814323680e09ebccb21b55aa020018310b60e4d580",
     "frontend/components/EntryList.vue": "9a7ef3a13643eb39412085af759b2b581afed2a69bf6c7a1e6a7baf03721dfea",
     "frontend/components/GridCell.vue": "827b97b4671ccdab510819e1d61e02d5e004e65b632f09ea0f251fe66b7459c2",
     "frontend/components/GroupChips.vue": "5d01df0212525707e25b7f1fcb7efcc990a6a787728ffc929badcd582b436afa",
@@ -50,12 +50,12 @@
     "frontend/views/split-motion.mjs": "6498362704f5a3f3d7657322b6c35b514ededdf3451d8e57d3e7cab33005745b",
     "frontend/views/surfaces.json": "0ebae0e386742d287233997e5a93026bd52411afc60215970348973c9ea5c8e4",
     "frontend/views/surfaces.mjs": "54f348383bdc269c141bc417450f14618a1107e336c92c65c694b466dd78cf34",
-    "frontend/views/transcript-tree.mjs": "983a984ce0a66fe0cbbc25cd3114dffe38ad6d09c0bd3e353d33792968322c2d",
+    "frontend/views/transcript-tree.mjs": "d888439eb226d3920cd5c30f59b90bb750357903cfbbf57fe906eabce69f3499",
     "frontend/views/transcript.mjs": "8e3c686d4d895834c85961175320c1d66f667f8e19a4c356dd9f9b6ebb74a4df",
     "frontend/vite.config.mjs": "00edf86999b3acc95fd11de5646c35194f54d900ae2f0b4b4ff5b978690eff70",
     "package-lock.json": "f4e93b34a637f4f8b4dd49e812ae379b49a1ff387fceb5c41e70a70e5cd57b9a",
     "package.json": "3a37965f16d05edb0644e70dbd73976407af7f4f94131e46c85bfdb9d8a55384",
     "tools/check_frontend_build.mjs": "682231c8eb5e86a773dbed1f8a6679cc6cc271d09defa99e4c0e9a6c2cf6a9e5"
   },
-  "bundle": "75f3ab9876e8f2a7fd0005d3ac3612e2e248a2d9653bfec044065b764124dbd8"
+  "bundle": "dbc6989582c09d13972b74d3772381b91d71bbff8b2bc3874e44bffc7ebb9e1b"
 }

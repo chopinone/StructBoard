@@ -42,6 +42,67 @@ function sseResponse(chunks, extra) {
 }
 
 (async function () {
+  // An announcement is intermediate work, not a final answer. The same user turn
+  // continues from a lookup to its upstream evidence without another user message.
+  {
+    const s = setup({ request: async (body, delta, opts, n) => {
+      if(n===1)return '我先查当前步骤的条目，再追溯来源。';
+      if(n===2){assert.match(body.messages.at(-1).content,/直接输出下一项/);return block('sb_list_entries',{limit:2});}
+      if(n===3)return '还需要继续查上游步骤，确认来源。';
+      if(n===4)return block('sb_list_entries',{limit:1});
+      return '候选来自上游复核步骤，作为对照加入当前步骤。';
+    }});
+    await s.engine.send('追溯虚构候选的来源');
+    assert.equal(s.requests.length,5);assert.equal(s.calls.length,2);
+    assert.equal(s.store.getMessages().filter(m=>m.role==='user'&&m.visible!==false).length,1);
+    assert.equal(s.store.getMessages().filter(m=>m.kind==='progress').length,2);
+    assert.match(s.store.getMessages().at(-1).content,/候选来自/);
+  }
+  // The old UI truncation must not remove the last entry or the next-page cursor
+  // from the live model payload. Reloaded history must explicitly ask for a reread.
+  {
+    const items=Array.from({length:200},(_,i)=>({entryId:'synthetic_'+i,name:'Synthetic candidate '+i+' '+('x'.repeat(90)),stepId:'stage_review'}));
+    const result={ok:true,result:{items,total:400,offset:0,nextCursor:'synthetic_next'}};
+    const s=setup({execute:()=>result,request:async(body,delta,opts,n)=>{
+      if(n===1)return block('sb_list_entries',{limit:20});
+      const content=body.messages.findLast(m=>m.content.startsWith('（系统）工具 sb_list_entries 结果：')).content;
+      const received=JSON.parse(content.split('结果：')[1]);
+      assert.equal(received.result.items.length,200);
+      assert.equal(received.result.items[199].entryId,'synthetic_199');
+      assert.equal(received.result.nextCursor,'synthetic_next');
+      return '已找到所需条目。';
+    }});
+    await s.engine.send('查看虚构列表');
+    const persisted=s.store.snapshot().messages.find(m=>m.kind==='tool-result');
+    assert.match(persisted.content,/重新读取/);assert(!persisted.content.includes('synthetic_199'));
+    const oversized=JSON.parse(A.modelToolResult({ok:true,result:{items:[{name:'x'.repeat(200000)}]}},
+      {name:'sb_list_entries',args:{stepId:'stage_review',cursor:'same_page',limit:200}}));
+    assert.equal(oversized.ok,false);assert.equal(oversized.error.code,'RESULT_TOO_LARGE');
+    assert.equal(oversized.retry.args.cursor,'same_page');assert.equal(oversized.retry.args.limit,50);
+  }
+  // Queries can span more than four steps, but still stop at a finite budget.
+  {
+    const s=setup({request:async(b,d,o,n)=>n<=6?block('sb_list_entries',{limit:1}):'来源已核实。'});
+    await s.engine.send('核对多步来源');assert.equal(s.calls.length,6);assert.equal(s.requests.length,7);
+  }
+  // A provider that keeps talking without calling tools is bounded and reports
+  // incompleteness; greetings and genuine blockers do not cause extra requests.
+  {
+    const s=setup({request:async()=> '我先查一下来源。'});
+    await s.engine.send('核对来源');assert.equal(s.requests.length,3);assert.equal(s.calls.length,0);
+    assert.match(s.store.getMessages().at(-1).content,/查询尚未完成/);
+    for(const answer of ['我是构境 AI 助手。','缺少步骤，请提供管线。','无法连接数据服务，需要你重新打开工作区。','来源是复核步骤，备注没有记录筛选理由。']){
+      const s=setup({request:async()=>answer});await s.engine.send('问题');assert.equal(s.requests.length,1);
+    }
+  }
+  // Stop also cancels the corrective request, before any tool is executed.
+  {
+    const pending=deferred();let signal;
+    const s=setup({request:async(b,d,o,n)=>{if(n===1)return '我先读取条目。';signal=o.signal;return pending.promise;}});
+    const run=s.engine.send('查询');for(let i=0;i<20&&!signal;i++)await tick();
+    assert(signal);s.engine.stop();pending.resolve(block('sb_list_entries'));
+    await run;assert(signal.aborted);assert.equal(s.calls.length,0);
+  }
   // A turn owns a single user record. Failed retries reuse it and hidden results enter subsequent payloads.
   {
     const s = setup({ request: async (body, onDelta, opts, n) => {

@@ -139,6 +139,7 @@ class Element {
     findTitle('收起').click(); A.openPanel();
     const execute = doc.body.querySelectorAll('button').find(node => node.textContent === '执行');
     assert(execute && !execute.disabled);
+    assert.equal(execute.closest('details').attributes.open,'true','pending changes remain expanded for review');
     execute.click();
     await waitFor(() => calls.length === 1 && requestCount === 4 && active.waiting);
     assert.equal(calls[0].context.approved, true);
@@ -148,6 +149,9 @@ class Element {
     chunk('data: {"choices":[{"delta":{"content":"文件夹完成"}}]}\n\ndata: [DONE]\n\n');
     await waitFor(() => stop.hidden);
     assert.equal(calls.length, 1);
+    const process=doc.body.querySelector('.ai-process');
+    assert(process&&process.tagName==='DETAILS');
+    assert.equal(process.attributes.open,undefined,'completed actions default to a collapsed process');
     findTitle('导出本机对话').click();
     assert.equal(downloads.length, 1);
     const exported = await downloads[0].text();

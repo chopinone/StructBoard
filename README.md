@@ -58,7 +58,7 @@ python -I -B tools/build_public_release.py --release dist/StructBoardTauri --out
 
 第一方代码按 **GNU GPL v3.0（GPL-3.0-only）** 发布，见 [LICENSE](LICENSE)。允许使用、修改和商用；对外发布衍生软件时需遵守 GPL，并提供对应源码。第三方组件保留各自许可证，见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
-Copyright (C) 2026 StructBoard contributors. 本软件按现状提供，不附带任何担保。
+Copyright (C) 2026 chopinone. 本软件按现状提供，不附带任何担保。
 
 ## 数据隔离与参与开发
 

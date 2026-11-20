@@ -405,6 +405,81 @@ test('migrated assistant and MCP panels preserve settings, streamed text and saf
   await expect(page.locator('.ai-msgs')).toContainText('第二段');expect(errors).toEqual([]);
 });
 
+test('assistant continues promised reads and keeps complete evidence behind collapsed process',async({page})=>{
+  await page.emulateMedia({reducedMotion:'reduce'});
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.addInitScript(()=>localStorage.setItem('structboard.ai.provider',JSON.stringify({format:'openai-chat',baseUrl:'https://stub.invalid/v1',model:'synthetic',stream:false})));
+  let requests=0;
+  await page.route('**/api/ai/chat',async route=>{
+    const body=route.request().postDataJSON();requests++;
+    let text;
+    if(requests===1)text='我先查候选条目，再核对上游来源。';
+    else if(requests===2)text='```sb-action\n'+JSON.stringify({action:'sb_list_entries',args:{limit:200}})+'\n```';
+    else if(requests===3){
+      const evidence=body.messages.findLast(m=>m.content.startsWith('（系统）工具 sb_list_entries 结果：'));
+      const result=JSON.parse(evidence.content.split('结果：')[1]);
+      expect(result.result.items).toHaveLength(200);
+      expect(result.result.items[199].name).toContain('Synthetic_199');
+      text='需要继续读取上游管线，确认来源。';
+    }else if(requests===4)text='```sb-action\n'+JSON.stringify({action:'sb_pipeline_get',args:{}})+'\n```';
+    else text='Synthetic_199 来自上游复核步骤，作为对照进入当前步骤。依据是管线备注。';
+    await route.fulfill({json:{ok:true,data:{choices:[{message:{content:text},finish_reason:'stop'}]}}});
+  });
+  await page.goto(access.url);await expect(page.locator('#appSplashScreen')).toBeHidden();
+  await page.evaluate(()=>{
+    window.__assistantReads=[];
+    window.SB_HARNESS.listTools=async()=>[
+      {name:'sb_list_entries',readOnly:true,inputSchema:{type:'object',properties:{limit:{type:'integer',maximum:200}},additionalProperties:false}},
+      {name:'sb_pipeline_get',readOnly:true,inputSchema:{type:'object',properties:{},additionalProperties:false}},
+    ];
+    window.SB_HARNESS.execute=async(name)=>{
+      window.__assistantReads.push(name);
+      return name==='sb_list_entries'?{ok:true,result:{items:Array.from({length:200},(_,i)=>({entryId:'synthetic_'+i,name:'Synthetic_'+i+' '+('x'.repeat(80))})),total:200,nextCursor:null}}
+        :{ok:true,result:{definition:{name:'Synthetic route',note:'Synthetic_199 is a control from upstream review.'}}};
+    };
+  });
+  await page.locator('.ai-bubble').click();await page.locator('.ai-input').fill('查一下虚构候选的来源');await page.locator('.ai-send').click();
+  const answer=page.locator('.ai-bubble-text').filter({hasText:'Synthetic_199 来自上游复核步骤'});
+  await expect(answer).toBeVisible();await expect(page.locator('#aiStop')).toBeHidden();
+  expect(requests).toBe(5);expect(await page.evaluate(()=>window.__assistantReads)).toEqual(['sb_list_entries','sb_pipeline_get']);
+  const process=page.locator('.ai-process');await expect(process).toHaveCount(1);
+  await expect(process).not.toHaveAttribute('open','');
+  await expect(page.locator('.ai-action-args').first()).toBeHidden();
+  await expect(page.locator('.ai-msg.is-user')).toHaveCount(1);
+  await page.screenshot({path:join(root,'_migration','assistant-folded.png')});
+  await process.locator(':scope > summary').click();
+  await expect(process).toHaveAttribute('open','');
+  await process.locator('.ai-action-head').first().click();
+  await expect(process.locator('.ai-action-args').first()).toBeVisible();
+  await page.locator('#aiClose').click();await page.locator('.ai-bubble').click();
+  await expect(process).toHaveAttribute('open','');expect(requests).toBe(5);
+  await page.reload();await expect(page.locator('#appSplashScreen')).toBeHidden();await page.locator('.ai-bubble').click();
+  await expect(page.locator('.ai-process')).not.toHaveAttribute('open','');
+  await expect(answer).toBeVisible();expect(requests).toBe(5);expect(errors).toEqual([]);
+});
+
+test('assistant dragging does not open chat and provider draft survives outside clicks',async({page})=>{
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await page.goto(access.url);await expect(page.locator('#appSplashScreen')).toBeHidden();
+  const bubble=page.locator('.ai-bubble'),panel=page.locator('.ai-panel');
+  const before=await bubble.boundingBox();
+  await page.mouse.move(before.x+30,before.y+30);await page.mouse.down();
+  await page.mouse.move(before.x-180,before.y-150,{steps:12});await page.mouse.up();
+  await expect(panel).toBeHidden();
+  const after=await bubble.boundingBox();expect(after.x).toBeLessThan(before.x-100);
+  await bubble.click();await expect(panel).toBeVisible();
+  await page.locator('#aiSettings').click();const mask=page.locator('.ai-settings-mask');
+  await expect(mask).toBeVisible();await page.locator('#aiSetModel').fill('draft-synthetic-provider');
+  await page.mouse.click(12,12);await expect(mask).toBeVisible();
+  await expect(page.locator('#aiSetModel')).toHaveValue('draft-synthetic-provider');
+  await page.keyboard.press('Escape');await expect(mask).toBeVisible();
+  await expect(page.locator('#aiSetModel')).toHaveValue('draft-synthetic-provider');
+  await page.locator('#aiSetClose').click();await expect(mask).toBeHidden();
+  await expect(panel).toBeVisible();
+  await page.locator('#aiClose').click();await expect(panel).toBeHidden();
+  await bubble.focus();await page.keyboard.press('Enter');await expect(panel).toBeVisible();
+});
+
 test('Vue pipeline canvas preserves nodes, notes, rename, delete and undo',async({page})=>{
   const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.emulateMedia({reducedMotion:'reduce'});
   await page.goto(access.url);await expect(page.locator('#appSplashScreen')).toBeHidden();await page.locator('#btnPipeline').click();

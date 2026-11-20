@@ -2770,6 +2770,15 @@ body.dark .ai-msg.is-ai .ai-bubble-text { background: rgba(48, 55, 76, .92); bor
 body.dark .ai-err { color: #ff9d95; }
 
 /* 动作确认卡 */
+.ai-process { margin: 4px 0 8px; border-left: 2px solid rgba(90,115,160,.2); padding-left: 10px; }
+.ai-process-summary { cursor: pointer; padding: 7px 2px; color: #65748a; font-size: 12px; user-select: none; }
+.ai-process-summary:focus-visible, .ai-action-head:focus-visible { outline: 2px solid #527dff; outline-offset: 2px; }
+body.dark .ai-process-summary { color: #a9b8cc; }
+.ai-process .ai-msg { margin-top: 6px; }
+.ai-action-state { margin-left: auto; color: #65748a; font-size: 11px; overflow-wrap: anywhere; }
+.ai-action-state.is-error { color: #b3261e; }
+body.dark .ai-action-state { color: #a9b8cc; }
+body.dark .ai-action-state.is-error { color: #ff9d95; }
 .ai-action-card {
   max-width: 100%; border-radius: 14px; overflow: hidden;
   background: rgba(255, 255, 255, .9);
@@ -2779,7 +2788,9 @@ body.dark .ai-err { color: #ff9d95; }
   font-size: 12px;
 }
 body.dark .ai-action-card { background: rgba(52, 59, 82, .94); border-color: rgba(255, 255, 255, .16); outline-color: rgba(0, 0, 0, .35); }
-.ai-action-head { display: flex; align-items: center; gap: 8px; padding: 8px 11px 6px; }
+.ai-action-head { display: flex; align-items: center; gap: 8px; padding: 9px 11px; cursor: pointer; }
+.ai-action-head::before { content: '›'; flex: 0 0 auto; }
+.ai-action-card[open] > .ai-action-head::before { transform: rotate(90deg); }
 .ai-action-tag {
   padding: 1.5px 8px; border-radius: 999px; font-size: 10px; font-weight: 700;
   background: linear-gradient(120deg, #4f8cff, #8a5bff); color: #fff;
@@ -2851,6 +2862,9 @@ body.dark .ai-input { background: rgba(26, 30, 44, .85); }
 }
 
 /* 设置弹层 */
+.ai-set-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ai-set-head h2 { margin: 0; }
+.ai-set-head .ai-icon-btn { flex: none; font-size: 24px; line-height: 1; }
 .ai-settings-mask {
   position: fixed; inset: 0; z-index: 10000;
   background: rgba(18, 24, 44, .35);
