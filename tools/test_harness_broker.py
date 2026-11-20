@@ -15,7 +15,19 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from harness_broker import HarnessBroker, assert_private_file, canonical, strict_json
+from harness_broker import HarnessBroker, assert_private_file, atomic_json, canonical, strict_json
+
+
+class PrivateStorageTests(unittest.TestCase):
+    def test_private_json_roundtrip_and_replace(self):
+        with tempfile.TemporaryDirectory(prefix='structboard-private-fixture-') as directory:
+            target = Path(directory) / 'synthetic-state.json'
+            for version in (1, 2):
+                value = {'fixture': True, 'version': version}
+                atomic_json(target, value, private=True)
+                assert_private_file(target)
+                self.assertEqual(json.loads(target.read_text(encoding='utf-8')), value)
+            self.assertEqual([p.name for p in Path(directory).iterdir()], [target.name])
 
 
 class Clock:
