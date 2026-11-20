@@ -1,0 +1,11 @@
+const org = require('../workspace_org.js');
+const first = { id: 'e1', name: 'demo.pdb', path: 'demo.pdb', size: 100, stepKey: 'plain' };
+const second = { id: 'e1', name: 'demo.pdb', path: 'demo.pdb', size: 100, stepKey: 'plain' };
+const store = { plain: { folders: [], dissolved: [], placements: {}, removed: ['e1'], notes: {} } };
+const rebound = org.rebind(store.plain, [second]);
+if (rebound.removed.length) throw new Error('runtime e1 key survived rebind');
+const hydrated = org.hydrate({ removed: ['e1'] }, [second]);
+if (hydrated.removed.length) throw new Error('runtime e1 key survived hydrate');
+const stable = org.placeId(first);
+if (stable === 'e1' || !stable.includes('demo.pdb')) throw new Error('unstable placeId: ' + stable);
+console.log('workspace_org identity ok');

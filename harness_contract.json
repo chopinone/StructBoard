@@ -1,0 +1,2157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": 1,
+  "description": "StructBoard desktop harness. Tools return asynchronous job snapshots; use sb_get_job until terminal. IDs and rootToken are opaque renderer-issued references. Workspace revisions are rN strings; canvas revisions are integers. Only the authenticated desktop UI can approve prepared changes. Pipeline roots are immutable; file sources stay relative to the authorized root.",
+  "limits": {
+    "requestBytes": 262144,
+    "responseBytes": 1048576,
+    "operations": 100,
+    "entries": 200,
+    "activeJobsPerSession": 8,
+    "activeJobs": 64,
+    "deadlineSeconds": 30,
+    "approvalSeconds": 300,
+    "heartbeatSeconds": 30
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.:-]*$"
+    },
+    "revision": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 64,
+      "pattern": "^r[0-9]+$"
+    },
+    "canvasRevision": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?!/)(?!.*[\\\\:\\x00-\\x1f\\x7f%])(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[. ](?:/|$))(?!.*//)[^\\s](?:.*[^\\s])?$"
+    },
+    "paths": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/relativePath"
+      },
+      "maxItems": 200,
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "key": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.:-]+$"
+    },
+    "text": {
+      "type": "string",
+      "maxLength": 20000
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "ids": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/id"
+      },
+      "maxItems": 200,
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "scopes": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "read",
+          "view",
+          "edit"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 3,
+      "uniqueItems": true
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z_]+$"
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 1000
+        }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entryId",
+        "stepId",
+        "name",
+        "star",
+        "format",
+        "size",
+        "modelIndex",
+        "folderId"
+      ],
+      "properties": {
+        "entryId": {
+          "$ref": "#/$defs/id"
+        },
+        "stepId": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 200,
+          "minLength": 0
+        },
+        "star": {
+          "type": "boolean"
+        },
+        "format": {
+          "type": "string",
+          "maxLength": 40,
+          "minLength": 0
+        },
+        "size": {
+          "type": "number",
+          "minimum": 0
+        },
+        "modelIndex": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "folderId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "metrics": {
+          "$ref": "#/$defs/metrics"
+        }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stepId",
+        "title",
+        "tool",
+        "entryCount",
+        "folders"
+      ],
+      "properties": {
+        "stepId": {
+          "$ref": "#/$defs/id"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 200,
+          "minLength": 0
+        },
+        "tool": {
+          "type": "string",
+          "maxLength": 200,
+          "minLength": 0
+        },
+        "entryCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "note": {
+          "$ref": "#/$defs/text"
+        },
+        "folders": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/folder"
+          },
+          "maxItems": 500,
+          "minItems": 0
+        }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stepId"
+      ],
+      "properties": {
+        "stepId": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "viewport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scale",
+        "tx",
+        "ty"
+      ],
+      "properties": {
+        "scale": {
+          "type": "number",
+          "minimum": 0.22,
+          "maximum": 2.6
+        },
+        "tx": {
+          "type": "number",
+          "minimum": -100000,
+          "maximum": 100000
+        },
+        "ty": {
+          "type": "number",
+          "minimum": -100000,
+          "maximum": 100000
+        }
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "tool",
+        "desc",
+        "note",
+        "x",
+        "y",
+        "ownership",
+        "manual",
+        "base"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 200,
+          "minLength": 1
+        },
+        "tool": {
+          "type": "string",
+          "maxLength": 80,
+          "minLength": 0
+        },
+        "desc": {
+          "type": "string",
+          "maxLength": 12000,
+          "minLength": 0
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 20000,
+          "minLength": 0
+        },
+        "x": {
+          "type": "number",
+          "minimum": -100000,
+          "maximum": 100000
+        },
+        "y": {
+          "type": "number",
+          "minimum": -100000,
+          "maximum": 100000
+        },
+        "binding": {
+          "$ref": "#/$defs/binding"
+        },
+        "ownership": {
+          "enum": [
+            "manual",
+            "base"
+          ]
+        },
+        "manual": {
+          "type": "boolean"
+        },
+        "base": {
+          "type": "boolean"
+        }
+      }
+    },
+    "edge": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/id"
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "pane": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "paneId",
+        "position",
+        "mode",
+        "cols",
+        "rows",
+        "entryIds",
+        "active"
+      ],
+      "properties": {
+        "paneId": {
+          "$ref": "#/$defs/id"
+        },
+        "position": {
+          "enum": [
+            "left",
+            "right"
+          ]
+        },
+        "mode": {
+          "enum": [
+            "overview",
+            "grid",
+            "overlay"
+          ]
+        },
+        "cols": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "rows": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "entryIds": {
+          "$ref": "#/$defs/emptyIds"
+        },
+        "active": {
+          "type": "boolean"
+        }
+      }
+    },
+    "canvasOperation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "node"
+          ],
+          "properties": {
+            "op": {
+              "const": "node.create"
+            },
+            "node": {
+              "$ref": "#/$defs/nodeInput"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "id",
+            "props"
+          ],
+          "properties": {
+            "op": {
+              "const": "node.update"
+            },
+            "id": {
+              "$ref": "#/$defs/id"
+            },
+            "props": {
+              "type": "object",
+              "additionalProperties": false,
+              "minProperties": 1,
+              "properties": {
+                "title": {
+                  "$ref": "#/$defs/title"
+                },
+                "tool": {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                "desc": {
+                  "$ref": "#/$defs/text"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "id",
+            "x",
+            "y"
+          ],
+          "properties": {
+            "op": {
+              "const": "node.move"
+            },
+            "id": {
+              "$ref": "#/$defs/id"
+            },
+            "x": {
+              "type": "number",
+              "minimum": -100000,
+              "maximum": 100000
+            },
+            "y": {
+              "type": "number",
+              "minimum": -100000,
+              "maximum": 100000
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "id"
+          ],
+          "properties": {
+            "op": {
+              "const": "node.delete"
+            },
+            "id": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "from",
+            "to"
+          ],
+          "properties": {
+            "op": {
+              "enum": [
+                "edge.connect",
+                "edge.disconnect"
+              ]
+            },
+            "from": {
+              "$ref": "#/$defs/id"
+            },
+            "to": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "id",
+            "text"
+          ],
+          "properties": {
+            "op": {
+              "const": "note.set"
+            },
+            "id": {
+              "$ref": "#/$defs/id"
+            },
+            "text": {
+              "$ref": "#/$defs/text"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "viewport"
+          ],
+          "properties": {
+            "op": {
+              "const": "viewport.set"
+            },
+            "viewport": {
+              "$ref": "#/$defs/viewport"
+            }
+          }
+        }
+      ]
+    },
+    "pipelineOperation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "name"
+          ],
+          "properties": {
+            "op": {
+              "const": "set_name"
+            },
+            "name": {
+              "$ref": "#/$defs/title"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "stepId",
+            "patch"
+          ],
+          "properties": {
+            "op": {
+              "const": "update_step"
+            },
+            "stepId": {
+              "$ref": "#/$defs/id"
+            },
+            "patch": {
+              "type": "object",
+              "additionalProperties": false,
+              "minProperties": 1,
+              "properties": {
+                "title": {
+                  "$ref": "#/$defs/title"
+                },
+                "tool": {
+                  "type": "string",
+                  "maxLength": 60,
+                  "minLength": 0
+                },
+                "dir": {
+                  "$ref": "#/$defs/relativeDir"
+                },
+                "globs": {
+                  "$ref": "#/$defs/paths"
+                },
+                "starGlobs": {
+                  "$ref": "#/$defs/paths"
+                },
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/fileInput"
+                  },
+                  "maxItems": 200,
+                  "minItems": 0
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "stepIds"
+          ],
+          "properties": {
+            "op": {
+              "const": "reorder_steps"
+            },
+            "stepIds": {
+              "$ref": "#/$defs/ids"
+            }
+          }
+        }
+      ]
+    },
+    "diff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "summary",
+        "changes"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "changes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 200,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "target",
+              "kind"
+            ],
+            "properties": {
+              "target": {
+                "type": "string",
+                "maxLength": 400,
+                "minLength": 1
+              },
+              "kind": {
+                "enum": [
+                  "add",
+                  "update",
+                  "remove",
+                  "create",
+                  "delete",
+                  "connect",
+                  "disconnect"
+                ]
+              },
+              "before": {
+                "type": "string",
+                "maxLength": 20000
+              },
+              "after": {
+                "type": "string",
+                "maxLength": 20000
+              }
+            }
+          }
+        }
+      }
+    },
+    "contextResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "pipelineId",
+        "counts",
+        "panes",
+        "steps",
+        "capabilities",
+        "revision"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "#/$defs/id"
+        },
+        "pipelineId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "counts": {
+          "$ref": "#/$defs/counts"
+        },
+        "panes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pane"
+          },
+          "maxItems": 8,
+          "minItems": 0
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/step"
+          },
+          "maxItems": 500,
+          "minItems": 0
+        },
+        "metricColumns": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1
+          },
+          "maxItems": 100,
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1
+          },
+          "maxItems": 32,
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "canvasId": {
+          "$ref": "#/$defs/id"
+        },
+        "canvasRevision": {
+          "$ref": "#/$defs/canvasRevision"
+        },
+        "revision": {
+          "$ref": "#/$defs/revision"
+        },
+        "changeId": {
+          "$ref": "#/$defs/id"
+        },
+        "durability": {
+          "$ref": "#/$defs/durability"
+        }
+      }
+    },
+    "entriesResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "total",
+        "offset",
+        "nextCursor",
+        "revision"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/entry"
+          },
+          "maxItems": 200,
+          "minItems": 0
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "nextCursor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "revision": {
+          "$ref": "#/$defs/revision"
+        },
+        "changeId": {
+          "$ref": "#/$defs/id"
+        },
+        "durability": {
+          "$ref": "#/$defs/durability"
+        }
+      }
+    },
+    "canvasResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canvasId",
+        "revision",
+        "viewRevision",
+        "nodes",
+        "edges",
+        "selection",
+        "viewport"
+      ],
+      "properties": {
+        "canvasId": {
+          "$ref": "#/$defs/id"
+        },
+        "revision": {
+          "$ref": "#/$defs/canvasRevision"
+        },
+        "viewRevision": {
+          "$ref": "#/$defs/canvasRevision"
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/node"
+          },
+          "maxItems": 2000,
+          "minItems": 0
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/edge"
+          },
+          "maxItems": 8000,
+          "minItems": 0
+        },
+        "selection": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "maxItems": 2000,
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "viewport": {
+          "$ref": "#/$defs/viewport"
+        },
+        "durability": {
+          "$ref": "#/$defs/canvasDurability"
+        }
+      }
+    },
+    "canvasMutationResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canvasId",
+        "revision",
+        "viewRevision",
+        "changeId",
+        "kind",
+        "contentChanged",
+        "viewChanged",
+        "changedNodeIds"
+      ],
+      "properties": {
+        "canvasId": {
+          "$ref": "#/$defs/id"
+        },
+        "revision": {
+          "$ref": "#/$defs/canvasRevision"
+        },
+        "viewRevision": {
+          "$ref": "#/$defs/canvasRevision"
+        },
+        "changeId": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "enum": [
+            "apply",
+            "undo"
+          ]
+        },
+        "contentChanged": {
+          "type": "boolean"
+        },
+        "viewChanged": {
+          "type": "boolean"
+        },
+        "changedNodeIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "maxItems": 2000,
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "noteChanges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "text"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "text": {
+                "type": "string",
+                "maxLength": 32000,
+                "minLength": 0
+              },
+              "stepId": {
+                "$ref": "#/$defs/id"
+              }
+            }
+          },
+          "maxItems": 2000,
+          "minItems": 0
+        },
+        "undoneChangeId": {
+          "$ref": "#/$defs/id"
+        },
+        "replayed": {
+          "type": "boolean"
+        },
+        "currentRevision": {
+          "$ref": "#/$defs/canvasRevision"
+        },
+        "currentViewRevision": {
+          "$ref": "#/$defs/canvasRevision"
+        },
+        "durability": {
+          "$ref": "#/$defs/canvasDurability"
+        },
+        "rendererApplied": {
+          "type": "boolean"
+        },
+        "localDurable": {
+          "type": "boolean"
+        },
+        "backendAck": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "notesLocalDurable": {
+          "type": "boolean"
+        },
+        "notesError": {
+          "type": "string",
+          "maxLength": 1000
+        }
+      }
+    },
+    "viewResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "paneId",
+        "mode",
+        "selected",
+        "loaded",
+        "failed",
+        "pending",
+        "cols",
+        "rows",
+        "revision"
+      ],
+      "properties": {
+        "paneId": {
+          "$ref": "#/$defs/id"
+        },
+        "mode": {
+          "enum": [
+            "grid",
+            "overlay"
+          ]
+        },
+        "selected": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "loaded": {
+          "$ref": "#/$defs/emptyIds"
+        },
+        "failed": {
+          "$ref": "#/$defs/emptyIds"
+        },
+        "pending": {
+          "$ref": "#/$defs/emptyIds"
+        },
+        "cols": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "rows": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        },
+        "revision": {
+          "$ref": "#/$defs/revision"
+        },
+        "changeId": {
+          "$ref": "#/$defs/id"
+        },
+        "durability": {
+          "$ref": "#/$defs/durability"
+        }
+      }
+    },
+    "pipelineResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "definition",
+        "revision"
+      ],
+      "properties": {
+        "definition": {
+          "$ref": "#/$defs/definition"
+        },
+        "revision": {
+          "$ref": "#/$defs/revision"
+        },
+        "changeId": {
+          "$ref": "#/$defs/id"
+        },
+        "durability": {
+          "$ref": "#/$defs/durability"
+        }
+      }
+    },
+    "anyResult": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/contextResult"
+        },
+        {
+          "$ref": "#/$defs/entriesResult"
+        },
+        {
+          "$ref": "#/$defs/canvasResult"
+        },
+        {
+          "$ref": "#/$defs/canvasMutationResult"
+        },
+        {
+          "$ref": "#/$defs/notesResult"
+        },
+        {
+          "$ref": "#/$defs/folderCreateResult"
+        },
+        {
+          "$ref": "#/$defs/folderMoveResult"
+        },
+        {
+          "$ref": "#/$defs/starResult"
+        },
+        {
+          "$ref": "#/$defs/viewResult"
+        },
+        {
+          "$ref": "#/$defs/pipelineResult"
+        },
+        {
+          "$ref": "#/$defs/pipelineApplyResult"
+        }
+      ]
+    },
+    "job": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jobId",
+        "requestId",
+        "sessionId",
+        "tool",
+        "state",
+        "createdAt",
+        "updatedAt",
+        "deadline"
+      ],
+      "properties": {
+        "jobId": {
+          "$ref": "#/$defs/id"
+        },
+        "requestId": {
+          "$ref": "#/$defs/id"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/id"
+        },
+        "tool": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^sb_[a-z_]+$"
+        },
+        "state": {
+          "enum": [
+            "queued",
+            "running",
+            "preparing",
+            "approval_required",
+            "completed",
+            "failed",
+            "cancelled",
+            "expired"
+          ]
+        },
+        "createdAt": {
+          "type": "number",
+          "minimum": 0
+        },
+        "updatedAt": {
+          "type": "number",
+          "minimum": 0
+        },
+        "deadline": {
+          "type": "number",
+          "minimum": 0
+        },
+        "result": {
+          "$ref": "#/$defs/anyResult"
+        },
+        "error": {
+          "$ref": "#/$defs/error"
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/revision"
+            },
+            {
+              "$ref": "#/$defs/canvasRevision"
+            }
+          ]
+        },
+        "durability": {
+          "$ref": "#/$defs/durability"
+        },
+        "diff": {
+          "$ref": "#/$defs/diff"
+        },
+        "diffHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "durability": {
+      "enum": [
+        "view",
+        "queued",
+        "local",
+        "pipeline",
+        "preview",
+        "error"
+      ]
+    },
+    "relativeDir": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/relativePath"
+        },
+        {
+          "const": ""
+        }
+      ]
+    },
+    "fileInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 200,
+          "minLength": 1
+        },
+        "path": {
+          "$ref": "#/$defs/relativePath"
+        }
+      }
+    },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "path"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 200,
+          "minLength": 0
+        },
+        "path": {
+          "$ref": "#/$defs/relativePath"
+        }
+      }
+    },
+    "emptyIds": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/id"
+      },
+      "maxItems": 200,
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "metricValue": {
+      "type": [
+        "number",
+        "string",
+        "boolean",
+        "null"
+      ],
+      "maxLength": 200
+    },
+    "metrics": {
+      "type": "object",
+      "maxProperties": 100,
+      "patternProperties": {
+        "^[^/\\\\:\\x00-\\x1f]{1,120}$": {
+          "$ref": "#/$defs/metricValue"
+        }
+      },
+      "additionalProperties": false
+    },
+    "folder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "folderId",
+        "name",
+        "parentId",
+        "memberCount"
+      ],
+      "properties": {
+        "folderId": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 200,
+          "minLength": 0
+        },
+        "parentId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "memberCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "note": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entries",
+        "steps",
+        "folders",
+        "starred",
+        "trash"
+      ],
+      "properties": {
+        "entries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "steps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "folders": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "starred": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "trash": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [],
+          "properties": {
+            "entries": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "steps": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "folders": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        }
+      }
+    },
+    "notesResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stepId",
+        "saved",
+        "revision"
+      ],
+      "properties": {
+        "stepId": {
+          "$ref": "#/$defs/id"
+        },
+        "saved": {
+          "const": true
+        },
+        "revision": {
+          "$ref": "#/$defs/revision"
+        },
+        "changeId": {
+          "$ref": "#/$defs/id"
+        },
+        "durability": {
+          "$ref": "#/$defs/durability"
+        }
+      }
+    },
+    "folderCreateResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stepId",
+        "folderId",
+        "members",
+        "revision"
+      ],
+      "properties": {
+        "stepId": {
+          "$ref": "#/$defs/id"
+        },
+        "folderId": {
+          "$ref": "#/$defs/id"
+        },
+        "members": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 200
+        },
+        "revision": {
+          "$ref": "#/$defs/revision"
+        },
+        "changeId": {
+          "$ref": "#/$defs/id"
+        },
+        "durability": {
+          "$ref": "#/$defs/durability"
+        }
+      }
+    },
+    "folderMoveResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stepId",
+        "folderId",
+        "moved",
+        "revision"
+      ],
+      "properties": {
+        "stepId": {
+          "$ref": "#/$defs/id"
+        },
+        "folderId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "moved": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 200
+        },
+        "revision": {
+          "$ref": "#/$defs/revision"
+        },
+        "changeId": {
+          "$ref": "#/$defs/id"
+        },
+        "durability": {
+          "$ref": "#/$defs/durability"
+        }
+      }
+    },
+    "starResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "changed",
+        "on",
+        "revision"
+      ],
+      "properties": {
+        "changed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 200
+        },
+        "on": {
+          "type": "boolean"
+        },
+        "revision": {
+          "$ref": "#/$defs/revision"
+        },
+        "changeId": {
+          "$ref": "#/$defs/id"
+        },
+        "durability": {
+          "$ref": "#/$defs/durability"
+        }
+      }
+    },
+    "pipelineStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stepId",
+        "title",
+        "tool",
+        "dir",
+        "globs",
+        "starGlobs",
+        "files"
+      ],
+      "properties": {
+        "stepId": {
+          "$ref": "#/$defs/id"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 200,
+          "minLength": 0
+        },
+        "tool": {
+          "type": "string",
+          "maxLength": 200,
+          "minLength": 0
+        },
+        "dir": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/relativeDir"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "globs": {
+          "$ref": "#/$defs/paths"
+        },
+        "starGlobs": {
+          "$ref": "#/$defs/paths"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/file"
+          },
+          "maxItems": 200,
+          "minItems": 0
+        }
+      }
+    },
+    "definition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pipelineId",
+        "name",
+        "rootToken",
+        "steps"
+      ],
+      "properties": {
+        "pipelineId": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 200,
+          "minLength": 0
+        },
+        "rootToken": {
+          "$ref": "#/$defs/id"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pipelineStep"
+          },
+          "maxItems": 500,
+          "minItems": 0
+        }
+      }
+    },
+    "pipelineDiff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pipelineId",
+        "before",
+        "after"
+      ],
+      "properties": {
+        "pipelineId": {
+          "$ref": "#/$defs/id"
+        },
+        "before": {
+          "$ref": "#/$defs/definition"
+        },
+        "after": {
+          "$ref": "#/$defs/definition"
+        }
+      }
+    },
+    "pipelineApplyResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applied",
+        "diff",
+        "definition",
+        "revision"
+      ],
+      "properties": {
+        "applied": {
+          "const": true
+        },
+        "diff": {
+          "$ref": "#/$defs/pipelineDiff"
+        },
+        "definition": {
+          "$ref": "#/$defs/definition"
+        },
+        "revision": {
+          "$ref": "#/$defs/revision"
+        },
+        "changeId": {
+          "$ref": "#/$defs/id"
+        },
+        "durability": {
+          "$ref": "#/$defs/durability"
+        }
+      }
+    },
+    "nodeInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "x",
+        "y"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 200,
+          "minLength": 1
+        },
+        "tool": {
+          "type": "string",
+          "maxLength": 80,
+          "minLength": 0
+        },
+        "desc": {
+          "type": "string",
+          "maxLength": 12000,
+          "minLength": 0
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 20000,
+          "minLength": 0
+        },
+        "x": {
+          "type": "number",
+          "minimum": -100000,
+          "maximum": 100000
+        },
+        "y": {
+          "type": "number",
+          "minimum": -100000,
+          "maximum": 100000
+        },
+        "binding": {
+          "$ref": "#/$defs/binding"
+        }
+      }
+    },
+    "canvasDurability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rendererApplied",
+        "localDurable",
+        "backendAck"
+      ],
+      "properties": {
+        "rendererApplied": {
+          "type": "boolean"
+        },
+        "localDurable": {
+          "type": "boolean"
+        },
+        "backendAck": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "notesLocalDurable": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "sb_get_context",
+      "description": "Read active workspace, opaque step/entry/pane handles and revisions. No filesystem roots or structure bytes.",
+      "scope": "read",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "includeNotes": {
+            "type": "boolean"
+          },
+          "includeMetrics": {
+            "type": "boolean"
+          }
+        }
+      },
+      "resultSchema": {
+        "$ref": "#/$defs/contextResult"
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/job"
+      }
+    },
+    {
+      "name": "sb_list_entries",
+      "description": "Read one bounded page of opaque entry handles; use returned cursor for the next page.",
+      "scope": "read",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "stepId": {
+            "$ref": "#/$defs/id"
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9_.:-]+$"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          },
+          "includeMetrics": {
+            "type": "boolean"
+          }
+        }
+      },
+      "resultSchema": {
+        "$ref": "#/$defs/entriesResult"
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/job"
+      }
+    },
+    {
+      "name": "sb_get_canvas",
+      "description": "Read nodes, edges and current revision of an existing canvas handle.",
+      "scope": "read",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "canvasId"
+        ],
+        "properties": {
+          "canvasId": {
+            "$ref": "#/$defs/id"
+          }
+        }
+      },
+      "resultSchema": {
+        "$ref": "#/$defs/canvasResult"
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/job"
+      }
+    },
+    {
+      "name": "sb_canvas_apply",
+      "description": "Apply bounded canvas operations against expectedRevision. Removing nodes or edges first prepares an actual diff for desktop user approval. Reuse the same idempotencyKey only for the same arguments.",
+      "scope": "edit",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "canvasId",
+          "expectedRevision",
+          "operations",
+          "idempotencyKey"
+        ],
+        "properties": {
+          "canvasId": {
+            "$ref": "#/$defs/id"
+          },
+          "expectedRevision": {
+            "$ref": "#/$defs/canvasRevision"
+          },
+          "operations": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/$defs/canvasOperation"
+            }
+          },
+          "idempotencyKey": {
+            "$ref": "#/$defs/key"
+          }
+        }
+      },
+      "resultSchema": {
+        "$ref": "#/$defs/canvasMutationResult"
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/job"
+      }
+    },
+    {
+      "name": "sb_canvas_undo",
+      "description": "Propose undoing one change against expectedRevision; the desktop user must confirm the actual prepared diff.",
+      "scope": "edit",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "canvasId",
+          "changeId",
+          "expectedRevision",
+          "idempotencyKey"
+        ],
+        "properties": {
+          "canvasId": {
+            "$ref": "#/$defs/id"
+          },
+          "changeId": {
+            "$ref": "#/$defs/id"
+          },
+          "expectedRevision": {
+            "$ref": "#/$defs/canvasRevision"
+          },
+          "idempotencyKey": {
+            "$ref": "#/$defs/key"
+          }
+        }
+      },
+      "resultSchema": {
+        "$ref": "#/$defs/canvasMutationResult"
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/job"
+      }
+    },
+    {
+      "name": "sb_notes_set",
+      "description": "Set one step note against the workspace revision. Text is literal content.",
+      "scope": "edit",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "stepId",
+          "text",
+          "expectedRevision",
+          "idempotencyKey"
+        ],
+        "properties": {
+          "stepId": {
+            "$ref": "#/$defs/id"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 5000,
+            "minLength": 0
+          },
+          "expectedRevision": {
+            "$ref": "#/$defs/revision"
+          },
+          "idempotencyKey": {
+            "$ref": "#/$defs/key"
+          }
+        }
+      },
+      "resultSchema": {
+        "$ref": "#/$defs/notesResult"
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/job"
+      }
+    },
+    {
+      "name": "sb_folder_create",
+      "description": "Create a display folder using existing step/entry handles. Does not move disk files.",
+      "scope": "edit",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "stepId",
+          "name",
+          "expectedRevision",
+          "idempotencyKey"
+        ],
+        "properties": {
+          "stepId": {
+            "$ref": "#/$defs/id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1
+          },
+          "parentId": {
+            "$ref": "#/$defs/id"
+          },
+          "entryIds": {
+            "$ref": "#/$defs/emptyIds"
+          },
+          "expectedRevision": {
+            "$ref": "#/$defs/revision"
+          },
+          "idempotencyKey": {
+            "$ref": "#/$defs/key"
+          }
+        }
+      },
+      "resultSchema": {
+        "$ref": "#/$defs/folderCreateResult"
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/job"
+      }
+    },
+    {
+      "name": "sb_folder_move",
+      "description": "Move existing entry handles between display folders. Omit folderId to move to the step root.",
+      "scope": "edit",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "stepId",
+          "entryIds",
+          "expectedRevision",
+          "idempotencyKey"
+        ],
+        "properties": {
+          "stepId": {
+            "$ref": "#/$defs/id"
+          },
+          "entryIds": {
+            "$ref": "#/$defs/ids"
+          },
+          "folderId": {
+            "$ref": "#/$defs/id"
+          },
+          "expectedRevision": {
+            "$ref": "#/$defs/revision"
+          },
+          "idempotencyKey": {
+            "$ref": "#/$defs/key"
+          }
+        }
+      },
+      "resultSchema": {
+        "$ref": "#/$defs/folderMoveResult"
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/job"
+      }
+    },
+    {
+      "name": "sb_star_set",
+      "description": "Set or clear stars on a bounded list of existing entries against the workspace revision.",
+      "scope": "edit",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entryIds",
+          "on",
+          "expectedRevision",
+          "idempotencyKey"
+        ],
+        "properties": {
+          "entryIds": {
+            "$ref": "#/$defs/ids"
+          },
+          "on": {
+            "type": "boolean"
+          },
+          "expectedRevision": {
+            "$ref": "#/$defs/revision"
+          },
+          "idempotencyKey": {
+            "$ref": "#/$defs/key"
+          }
+        }
+      },
+      "resultSchema": {
+        "$ref": "#/$defs/starResult"
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/job"
+      }
+    },
+    {
+      "name": "sb_view_open",
+      "description": "Open existing entries or one step in an explicit existing pane. Requires view scope. Select exactly one of entryIds or stepId; mode is grid or overlay.",
+      "scope": "view",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "paneId",
+          "mode"
+        ],
+        "properties": {
+          "paneId": {
+            "$ref": "#/$defs/id"
+          },
+          "entryIds": {
+            "$ref": "#/$defs/ids"
+          },
+          "stepId": {
+            "$ref": "#/$defs/id"
+          },
+          "mode": {
+            "enum": [
+              "grid",
+              "overlay"
+            ]
+          },
+          "cols": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8
+          },
+          "rows": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "split": {
+            "type": "boolean"
+          }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "entryIds"
+            ],
+            "not": {
+              "required": [
+                "stepId"
+              ]
+            }
+          },
+          {
+            "required": [
+              "stepId"
+            ],
+            "not": {
+              "required": [
+                "entryIds"
+              ]
+            }
+          }
+        ]
+      },
+      "resultSchema": {
+        "$ref": "#/$defs/viewResult"
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/job"
+      }
+    },
+    {
+      "name": "sb_pipeline_get",
+      "description": "Read the selected pipeline definition with only user-authorized opaque rootRef values.",
+      "scope": "read",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "pipelineId": {
+            "$ref": "#/$defs/id"
+          }
+        }
+      },
+      "resultSchema": {
+        "$ref": "#/$defs/pipelineResult"
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/job"
+      }
+    },
+    {
+      "name": "sb_pipeline_apply",
+      "description": "Propose allowlisted edits to an existing authorized pipeline. Root is immutable; file paths must be relative. Always prepares an actual diff for desktop user approval. Reuse idempotencyKey only for identical arguments.",
+      "scope": "edit",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "pipelineId",
+          "expectedRevision",
+          "operations",
+          "idempotencyKey"
+        ],
+        "properties": {
+          "pipelineId": {
+            "$ref": "#/$defs/id"
+          },
+          "expectedRevision": {
+            "$ref": "#/$defs/revision"
+          },
+          "operations": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/$defs/pipelineOperation"
+            }
+          },
+          "idempotencyKey": {
+            "$ref": "#/$defs/key"
+          }
+        }
+      },
+      "resultSchema": {
+        "$ref": "#/$defs/pipelineApplyResult"
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/job"
+      }
+    },
+    {
+      "name": "sb_get_job",
+      "description": "Read only a job owned by this paired session. approval_required must be resolved by the desktop user, never through tool arguments.",
+      "scope": "read",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "jobId"
+        ],
+        "properties": {
+          "jobId": {
+            "$ref": "#/$defs/id"
+          }
+        }
+      },
+      "resultSchema": {
+        "$ref": "#/$defs/job"
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/job"
+      }
+    },
+    {
+      "name": "sb_cancel_job",
+      "description": "Cancel only a job owned by this session. Cancellation after dispatch is best effort; check final state and revisions before a new edit.",
+      "scope": "read",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "jobId"
+        ],
+        "properties": {
+          "jobId": {
+            "$ref": "#/$defs/id"
+          }
+        }
+      },
+      "resultSchema": {
+        "$ref": "#/$defs/job"
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/job"
+      }
+    }
+  ]
+}

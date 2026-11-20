@@ -1,0 +1,287 @@
+/* Scoped assistant connection controls; no viewer, toolbar, or theme overrides. */
+.harness-indicator,
+.harness-panel,
+.harness-halo {
+  --harness-blue: var(--accent, #007aff);
+  --harness-cyan: #20bfd6;
+  --harness-violet: #8557ed;
+  --harness-warning: var(--warn, #ff9500);
+  --harness-focus: var(--accent-2, #0071e3);
+}
+
+.harness-indicator {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  flex: 0 1 auto;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+.harness-connection-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 30px;
+  max-width: 164px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+.harness-connection-button:hover,
+.harness-connection-button[aria-expanded="true"] { background: var(--hover); }
+.harness-connection-button:active { background: var(--hover-strong); }
+.harness-dot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  --lamp: var(--text-3);
+  --lamp-core: color-mix(in srgb, var(--lamp) 70%, white);
+  background: radial-gradient(circle at 38% 32%, var(--lamp-core) 9%, var(--lamp) 55%, color-mix(in srgb, var(--lamp) 75%, black));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--lamp) 24%, transparent);
+  pointer-events: none;
+}
+.harness-indicator[data-connected="true"] .harness-connection-button { border-color: color-mix(in srgb, var(--harness-blue) 16%, transparent); }
+.harness-indicator[data-state="connected"] .harness-dot,
+.harness-indicator[data-state="done"] .harness-dot,
+.harness-indicator[data-state="running"] .harness-dot {
+  --lamp: var(--harness-blue);
+  --lamp-core: #e4f8ff;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--lamp) 40%, transparent),
+    0 0 5px color-mix(in srgb, var(--lamp) 68%, transparent),
+    0 0 10px color-mix(in srgb, var(--lamp) 34%, transparent);
+}
+.harness-indicator[data-state="running"] .harness-dot {
+  --lamp-core: white;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--lamp) 70%, transparent), 0 0 7px var(--lamp),
+    0 0 13px color-mix(in srgb, var(--lamp) 55%, transparent);
+}
+.harness-indicator[data-state="approval"] .harness-dot { --lamp: var(--harness-warning); }
+.harness-indicator[data-state="error"] .harness-dot { --lamp: var(--danger); }
+.harness-activity-label, .harness-activity-short {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.harness-activity-short { display: none; }
+.harness-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Direct body child, entirely inside the client area. The transparent center
+   never intercepts input in the molecular viewport or title bar.
+   Canvas dialogs may sit above that titlebar; in that case only the edge layer
+   rises to 9997, below the assistant panel (9998) and settings (10000). */
+.harness-halo {
+  position: fixed;
+  inset: 0;
+  z-index: 41;
+  pointer-events: none !important;
+  user-select: none;
+  border-radius: inherit;
+  opacity: 0;
+  visibility: hidden;
+  contain: paint;
+  transition: opacity .35s ease, visibility .35s ease;
+}
+.harness-halo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+}
+/* Only a diffuse inner glow: connection states never add a perimeter line. */
+.harness-halo::after {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--harness-blue) 14%, transparent), transparent) top / 100% 42px no-repeat,
+    linear-gradient(0deg, color-mix(in srgb, var(--harness-cyan) 12%, transparent), transparent) bottom / 100% 42px no-repeat,
+    linear-gradient(90deg, color-mix(in srgb, var(--harness-blue) 11%, transparent), transparent) left / 42px 100% no-repeat,
+    linear-gradient(270deg, color-mix(in srgb, var(--harness-cyan) 12%, transparent), transparent) right / 42px 100% no-repeat;
+  box-shadow: inset 0 0 28px color-mix(in srgb, var(--harness-blue) 10%, transparent);
+  opacity: .45;
+}
+.harness-halo[data-state="connected"] { opacity: .82; visibility: visible; }
+.harness-halo[data-state="connected"]::after { opacity: .64; }
+.harness-halo[data-state="running"] { opacity: 1; visibility: visible; }
+.harness-halo[data-state="running"]::after { opacity: 1; }
+body:has(.canvas-overlay:not([hidden])) > .harness-halo,
+body:has(.canvas-overlay-modal:not([hidden])) > .harness-halo { z-index: 9997; }
+
+.harness-panel {
+  position: fixed;
+  z-index: 9998;
+  width: min(420px, calc(100vw - 24px));
+  padding: 16px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding: 12px;
+  color: var(--text);
+  background: var(--panel-overlay);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg, 14px);
+  box-shadow: var(--shadow-2);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+.harness-panel[hidden],
+.harness-panel [hidden] { display: none !important; }
+.harness-panel h2,
+.harness-panel h3,
+.harness-panel h4,
+.harness-panel p { margin: 0; }
+.harness-panel h2 { font-size: 15px; font-weight: 650; }
+.harness-panel h3 { margin-bottom: 10px; font-size: 12px; font-weight: 650; }
+.harness-panel h4 { font-size: 12px; font-weight: 600; }
+.harness-panel-head,
+.harness-controls,
+.harness-approval-actions { display: flex; align-items: center; gap: 8px; }
+.harness-panel-head { justify-content: space-between; margin-bottom: 8px; }
+.harness-controls { margin-top: 10px; flex-wrap: wrap; }
+.harness-controls #btnHarnessStop { margin-left: auto; }
+.harness-section { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.harness-action {
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm, 6px);
+  color: var(--text);
+  background: var(--panel-strong);
+  font: inherit;
+  line-height: 1.4;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.harness-action:hover:not(:disabled) { background: var(--hover-strong); }
+.harness-action:active:not(:disabled) { opacity: .78; }
+.harness-primary { color: var(--text); border-color: var(--harness-blue); background: var(--accent-soft); }
+.harness-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--harness-blue) 20%, var(--panel-strong)); }
+.harness-action:disabled { cursor: default; opacity: .5; }
+.harness-danger { color: var(--text); border-color: color-mix(in srgb, var(--danger) 55%, var(--line-strong)); }
+.harness-connection-button:focus-visible,
+.harness-panel button:focus-visible,
+.harness-panel input:focus-visible,
+.harness-panel summary:focus-visible {
+  outline: 2px solid var(--harness-focus);
+  outline-offset: 3px;
+}
+.harness-panel h2:focus { outline: 0; }
+.harness-muted,
+.harness-desktop-status { color: var(--text-2); }
+.harness-error {
+  margin-top: 10px !important;
+  padding: 8px 10px;
+  color: var(--text);
+  border-left: 3px solid var(--danger);
+  background: color-mix(in srgb, var(--danger) 9%, transparent);
+  border-radius: 4px;
+}
+.harness-scopes { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; padding: 0; border: 0; }
+.harness-scopes legend { margin-bottom: 6px; color: var(--text-2); }
+.harness-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm, 6px);
+  background: var(--panel-strong);
+  cursor: pointer;
+  transition: border-color .15s ease, background-color .15s ease;
+}
+.harness-check:hover:not(:has(input:disabled)) { border-color: var(--line-strong); }
+.harness-check:has(input:checked) {
+  border-color: color-mix(in srgb, var(--harness-blue) 45%, var(--line-strong));
+  background: var(--accent-soft);
+}
+.harness-check:has(input:disabled) { opacity: .6; cursor: default; }
+.harness-check input { width: 14px; height: 14px; margin: 0; accent-color: var(--harness-blue); }
+.harness-check input:disabled { cursor: default; }
+.harness-section > .harness-muted { margin: 8px 0; }
+.harness-pairing {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--harness-blue) 28%, var(--line));
+  border-radius: var(--r-md, 8px);
+}
+.harness-pair-code {
+  padding: 10px 12px;
+  background: var(--panel-input);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm, 6px);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 22px;
+  line-height: 1.35;
+  letter-spacing: .14em;
+  text-align: center;
+  user-select: text;
+}
+#harnessPairingExpiry { font-variant-numeric: tabular-nums; font-size: 11px; }
+.harness-copy-row { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; }
+.harness-copy-row .harness-primary { flex: 1 1 auto; }
+#harnessPairingMessage { font-size: 12px; }
+.harness-sessions,
+.harness-running { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.harness-session { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
+.harness-session-text { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
+.harness-session strong { font-weight: 600; }
+.harness-session-text strong, .harness-session-text .harness-muted, .harness-desktop-status { overflow-wrap: anywhere; }
+.harness-session-online { color: var(--harness-focus); font-weight: 600; }
+.harness-session-alias { width: 100%; min-width: 0; padding: 5px 6px; color: var(--text); background: var(--panel-input); border: 1px solid var(--line-strong); border-radius: 6px; }
+.harness-running li { padding: 7px 9px; border-radius: 6px; background: var(--accent-soft); }
+.harness-requests { display: grid; gap: 10px; }
+.harness-running:not(:empty) + .harness-requests:not(:empty) { margin-top: 10px; }
+.harness-approval { border: 1px solid color-mix(in srgb, var(--harness-warning) 60%, var(--line-strong)); border-radius: var(--r-md, 8px); }
+.harness-approval > summary { padding: 10px; cursor: pointer; }
+.harness-approval > summary strong { font-weight: 600; }
+.harness-approval-body { padding: 0 10px 10px; }
+.harness-request-id { color: var(--text-2); font-size: 11px; }
+.harness-diff-summary { margin-top: 8px !important; font-weight: 600; white-space: pre-wrap; }
+.harness-diff-change { margin: 10px 0; padding: 9px; background: var(--panel-input); border-radius: 6px; }
+.harness-diff-value { margin-top: 8px; }
+.harness-panel pre { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: ui-monospace, Consolas, monospace; font-size: 11px; line-height: 1.5; user-select: text; }
+.harness-request-args { margin: 10px 0; }
+.harness-request-args > summary { min-height: 24px; cursor: pointer; color: var(--text-2); }
+.harness-request-args pre { max-height: 180px; overflow: auto; }
+.harness-request-message { margin-top: 8px !important; color: var(--text-2); }
+.harness-approval-actions { justify-content: flex-end; flex-wrap: wrap; margin-top: 10px; }
+
+@media (max-width: 1180px) {
+  .harness-activity-label { display: none; }
+  .harness-activity-short { display: inline; }
+}
+@media (max-width: 780px) {
+  .harness-activity-short { display: none; }
+  .harness-connection-button { justify-content: center; }
+}
+.harness-client-list { display: grid; gap: 9px; }
+.harness-client { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 10px; }
+.harness-client .harness-session-text { min-width: 0; }
+.harness-client .harness-action { flex-shrink: 0; }

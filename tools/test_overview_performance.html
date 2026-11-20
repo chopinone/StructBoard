@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StructBoard · Overview 性能验收</title>
+<link rel="stylesheet" href="../styles.css">
+<link rel="stylesheet" href="../vendor/molstar.css">
+<style>
+  :root { color-scheme: light; --perf-ink: #223349; --perf-muted: #526377; --perf-line: #ccd5df; --perf-accent: #225b93; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body { display: block; background: #f4f6f8; color: var(--perf-ink); font: 14px/1.5 system-ui, sans-serif; }
+  .perf-header, .perf-results, .perf-help { margin: 0 auto; max-width: 1600px; padding: 12px 20px; }
+  .perf-header h1 { margin: 0 0 4px; font-size: 20px; }
+  .perf-header p, .perf-help p { margin: 4px 0; color: var(--perf-muted); }
+  .perf-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin-top: 12px; }
+  .perf-controls label { display: grid; gap: 3px; font-size: 12px; }
+  .perf-controls select, .perf-controls button { min-height: 44px; padding: 6px 12px; border: 1px solid var(--perf-line); border-radius: 7px; background: white; color: var(--perf-ink); font: inherit; }
+  .perf-controls button { cursor: pointer; }
+  .perf-controls button.primary { background: var(--perf-accent); color: white; border-color: var(--perf-accent); }
+  .perf-controls :disabled { cursor: default; opacity: .55; }
+  .perf-controls :focus-visible, summary:focus-visible { outline: 3px solid #3784c7; outline-offset: 3px; }
+  #perfStatus { min-height: 24px; margin: 10px 0 0; }
+  #perfWorkspace { display: grid; grid-template-columns: repeat(var(--perf-panes, 1), minmax(0, 1fr)); gap: 10px; height: clamp(300px, calc(100vh - 270px), 600px); margin: 0 20px; }
+  #perfWorkspace.is-running { pointer-events: none; }
+  .perf-pane { position: relative; min-width: 0; min-height: 0; overflow: hidden; border: 1px solid var(--perf-line); border-radius: 8px; background: #fff; }
+  .perf-pane .overview-stage { --overview-top: 4px; }
+  .perf-pane .overview-head { flex: 0 0 42px; min-height: 42px; max-height: 42px; overflow: hidden; }
+  .perf-pane .overview-status, .perf-pane [data-perf-control] { display: none !important; }
+  .perf-pane .overview-scroll { scroll-behavior: auto !important; overflow-anchor: none; overflow-y: scroll; }
+  .perf-placeholder { padding: 20px; color: var(--perf-muted); }
+  .perf-results { overflow: auto; }
+  #perfSummary:empty { display: none; }
+  #perfSummary { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  #perfSummary th, #perfSummary td { padding: 8px; text-align: left; border-bottom: 1px solid var(--perf-line); white-space: nowrap; }
+  #perfSummary caption { text-align: left; padding-bottom: 8px; font-weight: 600; }
+  .perf-results details { margin-top: 12px; }
+  .perf-results summary { cursor: pointer; }
+  #perfOutput { max-height: 420px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.5 ui-monospace, monospace; }
+  .perf-help { font-size: 12px; }
+  .perf-help code { overflow-wrap: anywhere; }
+  #thumbnailHost { position: fixed; left: -10000px; top: 0; width: 320px; height: 240px; overflow: hidden; pointer-events: none; }
+  @media (max-width: 640px) { .perf-header, .perf-results, .perf-help { padding: 10px; } #perfWorkspace { margin: 0 10px; gap: 6px; } }
+</style>
+</head>
+<body>
+<header class="perf-header">
+  <h1>Overview 性能验收 <small id="perfVariant"></small></h1>
+  <p>实际 overview / 实际卡片 DOM · 每栏 100 或 1000 条平铺 · 不读取用户工作区 · 手动启动一组</p>
+  <form id="perfForm" class="perf-controls">
+    <label>每栏条数<select id="perfCount"><option value="100">100</option><option value="1000" selected>1000</option></select></label>
+    <label>栏数<select id="perfPanes"><option value="1">单栏</option><option value="2">双栏</option></select></label>
+    <label>缓存<select id="perfCache"><option value="cold">cold · 清空</option><option value="memory">memory · 起始窗口预热</option><option value="disk">disk · 磁盘预置</option></select></label>
+    <label>生成<select id="perfGeneration"><option value="paused">paused · 暂停</option><option value="synthetic">synthetic · 合成封面</option><option value="real">real · Mol* 小模型</option></select></label>
+    <label>重复<select id="perfRepeat"><option value="3">3 次</option><option value="1">1 次</option></select></label>
+    <button class="primary" id="perfStart" type="submit">开始一组</button>
+    <button id="perfCancel" type="button" disabled>取消</button>
+    <button id="perfDestroy" type="button">释放</button>
+  </form>
+  <p id="perfStatus" role="status" aria-live="polite">就绪。每次约 2.8 秒，三次通常约 10 秒；不会自动遍历测试矩阵。</p>
+</header>
+<main id="perfWorkspace" aria-label="实际 overview 测量窗口"><div class="perf-pane perf-placeholder">运行时在此挂载实际 overview。</div></main>
+<section class="perf-results" aria-label="最终测量结果">
+  <table id="perfSummary"></table>
+  <details><summary>最终 JSON（也可通过 result() 读取）</summary><pre id="perfOutput">尚无结果</pre></details>
+</section>
+<aside class="perf-help">
+  <p><code>?variant=before</code> 使用 <code>tools/_tmp/perf-before/overview.js</code>；默认 after 使用 <code>../overview.js</code>。请通过现有同 origin HTTP 地址打开，保持前台、相同视口和缩放。</p>
+  <p>memory 只预热实际起始窗口：1000 条超出解码内存预算，滚动中会出现磁盘回读。三种缓存状态复用同 variant、同 pane、同 entry key，每次重复覆盖验收专用缓存，不更换 key。</p>
+  <p>synthetic 用 Canvas 2D 模拟 Mol* 截图 hook，保留实际生成调度、图片编码、缓存与 DOM 流程，不能代表真实 GPU 成本。real 使用本地 Mol* 和内置小型 PDB，也不能代表大型蛋白。预置缓存统一使用合成封面。</p>
+  <p>固定轨迹：顶部停留 450ms → 950ms 匀速到底 → 950ms 匀速回顶 → 停留 450ms。DOM 峰值指实际挂载卡片与几何可见卡片；探针开销单独记录。布局/窗口函数用同一已知函数包装插桩，耗时是同步包含耗时。</p>
+</aside>
+<div id="thumbnailHost" aria-hidden="true"></div>
+<script src="../ui/shell.js"></script>
+<script src="../lineage.js"></script>
+<script src="../workspace_org.js"></script>
+<script>
+'use strict';
+(() => {
+  const $ = id => document.getElementById(id);
+  const variant = new URLSearchParams(location.search).get('variant') === 'before' ? 'before' : 'after';
+  const SOURCE_PATH = variant === 'before' ? '_tmp/perf-before/overview.js' : '../overview.js';
+  const DB_NAME = 'structboard-perf-fixture-' + variant + '-v1';
+  const STORAGE_PREFIX = 'ovperf.' + variant + '.';
+  const REPETITION_MS = 2800, DWELL_MS = 450, SCROLL_MS = 1900;
+  const METHOD = 'known-function-wrap-v1';
+  const history = new Map(), geometry = new WeakMap();
+  let sequence = 0, currentRun = null, live = null, disposed = false, molstarReady = null, coverReady = null;
+  $('perfVariant').textContent = '· ' + variant;
+
+  const round = n => Number(Number(n).toFixed(3));
+  const copy = value => value == null ? value : JSON.parse(JSON.stringify(value));
+  const percentile = (values, fraction) => {
+    if (!values.length) return null;
+    const sorted = values.slice().sort((a, b) => a - b);
+    return round(sorted[Math.max(0, Math.ceil(sorted.length * fraction) - 1)]);
+  };
+  const median = values => {
+    const sorted = values.filter(Number.isFinite).sort((a, b) => a - b), n = sorted.length;
+    return n ? round(n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2) : null;
+  };
+  const cancelled = () => new DOMException('性能验收已取消', 'AbortError');
+  function check(run) { if (run.controller.signal.aborted || disposed) throw cancelled(); }
+  function wait(run, ms) {
+    return new Promise((resolve, reject) => {
+      const signal = run.controller.signal;
+      if (signal.aborted) { reject(cancelled()); return; }
+      const end = () => { clearTimeout(timer); signal.removeEventListener('abort', abort); resolve(); };
+      const abort = () => { clearTimeout(timer); signal.removeEventListener('abort', abort); reject(cancelled()); };
+      const timer = setTimeout(end, ms);
+      signal.addEventListener('abort', abort, { once: true });
+    });
+  }
+  function nextFrame(run) {
+    return new Promise((resolve, reject) => {
+      const signal = run.controller.signal;
+      if (signal.aborted) { reject(cancelled()); return; }
+      const id = requestAnimationFrame(time => { signal.removeEventListener('abort', abort); resolve(time); });
+      const abort = () => { cancelAnimationFrame(id); signal.removeEventListener('abort', abort); reject(cancelled()); };
+      signal.addEventListener('abort', abort, { once: true });
+    });
+  }
+  function viewport() {
+    return { width: innerWidth, height: innerHeight, devicePixelRatio, visualWidth: visualViewport ? round(visualViewport.width) : null,
+      visualHeight: visualViewport ? round(visualViewport.height) : null, visualScale: visualViewport ? visualViewport.scale : null };
+  }
+  function readGeometry(layout) {
+    const grid = layout && layout.grids && layout.grids[0];
+    return grid ? { columns: grid.colsN, cardWidth: round(grid.cardWidth), cardHeight: round(grid.cardH), rowHeight: round(grid.rowHeight),
+      contentHeight: round(layout.height), layoutItems: layout.items.length, grids: layout.grids.length } : null;
+  }
+
+  // Only the two known functions in the fixed local overview source are wrapped.
+  // No user-provided source, URL, expression, eval(), or Function constructor is used.
+  /* PERF_TRANSFORM_BEGIN */
+  function instrumentKnownSource(source) {
+    let transformed = source;
+    for (const name of ['renderWindow', 'layoutOf']) {
+      let matches = 0;
+      const pattern = new RegExp('\\bfunction\\s+' + name + '\\s*\\(([^)]*)\\)\\s*\\{', 'g');
+      transformed = transformed.replace(pattern, (declaration, parameters) => {
+        matches++;
+        return 'function ' + name + '(' + parameters + ') { return window.__OV_PERF_TAP__.invoke(hooks.root || document, "' + name + '", __ovPerfOriginal_' + name + ', this, arguments); }\n' +
+          'function __ovPerfOriginal_' + name + '(' + parameters + ') {';
+      });
+      if (matches !== 1) throw Error('插桩接口不匹配：' + name + '，匹配数 ' + matches + '（需要恰好一个已知函数）');
+    }
+    let databases = 0;
+    transformed = transformed.replace(/(['"])structboard-thumbs\1/g, () => { databases++; return JSON.stringify(DB_NAME); });
+    if (!databases) throw Error('未识别 overview 缩略图数据库，拒绝访问生产缓存');
+    transformed = transformed.replace(/(['"])structboard\.([a-zA-Z0-9_.-]+)\1/g,
+      (literal, quote, key) => JSON.stringify('ovperf.' + variant + '.' + key));
+    if (!transformed.includes(JSON.stringify('ovperf.' + variant + '.overviewLite'))) throw Error('未识别隔离的 lite 设置');
+    return transformed;
+  }
+  /* PERF_TRANSFORM_END */
+
+  window.__OV_PERF_TAP__ = {
+    invoke(root, name, fn, receiver, args) {
+      const collector = live, paneIndex = Number(root && root.dataset && root.dataset.perfPane);
+      const bucket = collector && collector.metrics[paneIndex] && collector.metrics[paneIndex][name];
+      const began = bucket ? performance.now() : 0;
+      let value;
+      try { value = fn.apply(receiver, args); return value; }
+      finally {
+        if (bucket) {
+          const elapsed = performance.now() - began;
+          bucket.calls++; bucket.totalMs += elapsed; bucket.maxMs = Math.max(bucket.maxMs, elapsed);
+        }
+        if (name === 'layoutOf' && value) geometry.set(root, readGeometry(value));
+        if (bucket && name === 'renderWindow') collector.sampleDOM();
+      }
+    }
+  };
+
+  function insertScript(run, url) {
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script'), signal = run.controller.signal;
+      if (signal.aborted) { reject(cancelled()); return; }
+      const cleanup = () => { clearTimeout(timer); signal.removeEventListener('abort', abort); script.remove(); };
+      const abort = () => { cleanup(); reject(cancelled()); };
+      const timer = setTimeout(() => { cleanup(); reject(Error('脚本加载超时：' + url)); }, 8000);
+      script.onload = () => { cleanup(); resolve(); };
+      script.onerror = () => { cleanup(); reject(Error('无法加载脚本（检查路径和 CSP）：' + url)); };
+      signal.addEventListener('abort', abort, { once: true });
+      script.src = url; document.head.appendChild(script);
+    });
+  }
+  async function loadOverview(run) {
+    if (!/^https?:$/.test(location.protocol)) throw Error('请通过现有同 origin HTTP 地址打开此页；此页不会启动服务器');
+    if (!window.SB_LINEAGE || !window.SB_ORG) throw Error('lineage.js 或 workspace_org.js 未加载');
+    const response = await fetch(SOURCE_PATH, { cache: 'no-store', signal: run.controller.signal });
+    if (!response.ok) throw Error('overview 源文件不可用：' + SOURCE_PATH + ' (' + response.status + ')');
+    const source = await response.text(); check(run);
+    let hash;
+    if (window.crypto && crypto.subtle) {
+      const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(source));
+      hash = 'sha256:' + Array.from(new Uint8Array(bytes), value => value.toString(16).padStart(2, '0')).join('');
+    } else {
+      let value = 2166136261;
+      for (let i = 0; i < source.length; i++) value = Math.imul(value ^ source.charCodeAt(i), 16777619);
+      hash = 'fnv1a32:' + (value >>> 0).toString(16);
+    }
+    const transformed = instrumentKnownSource(source);
+    const url = URL.createObjectURL(new Blob([transformed], { type: 'text/javascript' }));
+    try { await insertScript(run, url); } finally { URL.revokeObjectURL(url); }
+    check(run);
+    if (!window.SB_OVERVIEW || typeof SB_OVERVIEW.create !== 'function') throw Error('SB_OVERVIEW.create 未注册');
+    return { source: SOURCE_PATH, sourceHash: hash, method: METHOD, functions: ['renderWindow', 'layoutOf'],
+      timing: '实际内部调用和公开 API 调用均计数；同步包含耗时；renderWindow 包含 layoutOf，不可相加',
+      isolation: { database: DB_NAME, localStoragePrefix: STORAGE_PREFIX, key: 'ovperf-v1|' + variant + '|pane:<n>|entry:<i>' },
+      sourceChange: '只包装已知函数并替换测试存储命名空间；before / after 使用同一转换器' };
+  }
+
+  function coverCanvas(index = 0) {
+    const canvas = document.createElement('canvas'); canvas.width = 320; canvas.height = 240;
+    drawCover(canvas, index); return canvas;
+  }
+  function drawCover(canvas, index) {
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#f6f5f0'; ctx.fillRect(0, 0, 320, 240);
+    const colors = ['#2f6fad', '#d05a3c', '#3d9367', '#9a63b8'];
+    ctx.lineWidth = 10; ctx.strokeStyle = colors[index % colors.length]; ctx.beginPath();
+    for (let i = 0; i < 9; i++) {
+      const x = 48 + i * 28, y = 120 + Math.sin(i * 1.2 + index % 5) * 52;
+      if (!i) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    for (let i = 0; i < 9; i++) {
+      ctx.fillStyle = colors[(index + i) % colors.length]; ctx.beginPath();
+      ctx.arc(48 + i * 28, 120 + Math.sin(i * 1.2 + index % 5) * 52, 12, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  function coverBlob() {
+    if (!coverReady) coverReady = new Promise((resolve, reject) => {
+      coverCanvas().toBlob(blob => blob ? resolve(blob) : reject(Error('测试封面编码失败')), 'image/webp', .8);
+    });
+    return coverReady;
+  }
+  function syntheticViewer() {
+    const canvas = coverCanvas(), screenshot = { values: {}, behaviors: { values: { next() {} } }, getPreview: async () => ({ canvas }) };
+    const c3d = { commit() {}, setProps() {}, camera: { transition: { inTransition: false } } };
+    return { canvas, handleResize() {}, dispose() {}, plugin: { canvas3d: c3d, canvas: c3d,
+      animationLoop: { start() {}, stop() {} }, helpers: { viewportScreenshot: screenshot } } };
+  }
+  function miniaturePdb() {
+    const residues = ['ALA', 'GLY', 'SER', 'LEU', 'VAL', 'LYS', 'ALA', 'GLU', 'GLY', 'LEU', 'SER', 'VAL'];
+    const lines = residues.map((residue, i) => {
+      const theta = i * 1.745, x = (Math.cos(theta) * 3.5).toFixed(3).padStart(8),
+        y = (Math.sin(theta) * 3.5).toFixed(3).padStart(8), z = (i * 1.5).toFixed(3).padStart(8);
+      return 'ATOM  ' + String(i + 1).padStart(5) + '  CA  ' + residue + ' A' + String(i + 1).padStart(4) + '    ' + x + y + z + '  1.00 20.00           C  ';
+    });
+    return lines.join('\n') + '\nTER\nEND\n';
+  }
+  const pdb = miniaturePdb();
+  async function ensureMolstar(run) {
+    if (window.molstar && molstar.Viewer) return;
+    if (!molstarReady) molstarReady = insertScript(run, '../vendor/molstar.js').catch(error => { molstarReady = null; throw error; });
+    await molstarReady; check(run);
+    if (!window.molstar || !molstar.Viewer) throw Error('本地 Mol* 不可用；请选择 synthetic 或 paused');
+  }
+  function generationHooks(mode, counts) {
+    if (mode !== 'real') return {
+      createViewer: async () => syntheticViewer(), clearViewer: async () => {},
+      async loadEntryInto(viewer, entry) { counts.loads++; return entry; },
+      async prepare(viewer, entry) { counts.prepares++; drawCover(viewer.canvas, entry.fixtureIndex); }, resetCamera: async () => {}
+    };
+    return {
+      createViewer: host => molstar.Viewer.create(host, { layoutIsExpanded: false, layoutShowControls: false,
+        layoutShowSequence: false, layoutShowLog: false, layoutShowLeftPanel: false, viewportShowControls: false,
+        viewportShowAnimation: false, viewportBackgroundColor: '#f6f5f0' }),
+      clearViewer: viewer => viewer.plugin.clear(false),
+      async loadEntryInto(viewer, entry) {
+        counts.loads++;
+        await viewer.loadStructureFromData(pdb, 'pdb', { dataLabel: entry.name });
+        const ref = viewer.plugin.managers.structure.hierarchy.current.structures[0];
+        if (!ref) throw Error('内置小型 PDB 未生成结构');
+        return ref;
+      },
+      async prepare(viewer, entry, ref) {
+        counts.prepares++;
+        viewer.plugin.canvas3d.setProps({ renderer: { backgroundColor: 0xf6f5f0 }, multiSample: { mode: 'off' },
+          postprocessing: { occlusion: { name: 'off', params: {} }, outline: { name: 'off', params: {} } } });
+        await viewer.plugin.managers.structure.component.updateRepresentationsTheme(ref.components, { color: 'uniform', colorParams: { value: 0x2f6fad } });
+      },
+      async resetCamera(viewer, ms) { viewer.plugin.managers.camera.reset(undefined, ms); }
+    };
+  }
+
+  function entryKey(pane, index) { return 'ovperf-v1|' + variant + '|pane:' + pane + '|entry:' + index; }
+  async function openTestDb(run) {
+    return new Promise((resolve, reject) => {
+      let finished = false;
+      const request = indexedDB.open(DB_NAME, 2), signal = run.controller.signal;
+      const finish = (error, value) => {
+        if (finished) { if (value) value.close(); return; }
+        finished = true; clearTimeout(timer); signal.removeEventListener('abort', abort);
+        if (error) reject(error); else resolve(value);
+      };
+      const abort = () => finish(cancelled());
+      const timer = setTimeout(() => finish(Error('验收数据库被阻塞或不可用；请关闭同 variant 的其他验收页')), 3000);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains('thumbs')) db.createObjectStore('thumbs');
+        if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta');
+      };
+      request.onsuccess = () => finish(null, request.result);
+      request.onerror = () => finish(request.error || Error('验收 IndexedDB 打开失败'));
+      signal.addEventListener('abort', abort, { once: true });
+      if (signal.aborted) abort();
+    });
+  }
+  async function prepareCache(run) {
+    check(run);
+    // This is a dedicated fixture database. Never open/clear structboard-thumbs.
+    const blob = run.options.cache === 'cold' ? null : await coverBlob();
+    const db = await openTestDb(run);
+    try {
+      check(run);
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction(['thumbs', 'meta'], 'readwrite'), signal = run.controller.signal;
+        const abort = () => { try { tx.abort(); } catch (_) {} };
+        const finish = error => { signal.removeEventListener('abort', abort); if (error) reject(error); else resolve(); };
+        tx.oncomplete = () => finish();
+        tx.onerror = () => finish(tx.error || Error('验收缓存事务失败'));
+        tx.onabort = () => finish(signal.aborted ? cancelled() : tx.error || Error('验收缓存事务已中断'));
+        signal.addEventListener('abort', abort, { once: true });
+        const thumbs = tx.objectStore('thumbs'), meta = tx.objectStore('meta');
+        thumbs.clear(); meta.clear();
+        const index = { items: {}, bytes: 0 };
+        if (blob) {
+          for (let pane = 0; pane < run.options.panes; pane++) for (let i = 0; i < run.options.count; i++) {
+            const key = entryKey(pane, i); thumbs.put(blob, key);
+            index.items[key] = { size: blob.size, touched: 1 }; index.bytes += blob.size;
+          }
+        }
+        meta.put(index, 'index');
+      });
+      localStorage.setItem(STORAGE_PREFIX + 'overviewLite', '0');
+      localStorage.removeItem(STORAGE_PREFIX + 'stepCollapsed.v2');
+      return { diskEntries: blob ? run.options.count * run.options.panes : 0, encodedBytes: blob ? blob.size * run.options.count * run.options.panes : 0,
+        seed: blob ? 'procedural Canvas 2D WebP (not Mol* / not GPU)' : null, database: DB_NAME, reset: '同一数据库和 key，每次重复先清空并按模式覆盖' };
+    } finally { db.close(); }
+  }
+  function setPaused(pane, paused) {
+    if (!!pane.api.stats.paused !== paused) pane.pause.click();
+    if (!!pane.api.stats.paused !== paused) throw Error('实际 overview 暂停接口不匹配');
+  }
+  function mountPanes(run) {
+    const host = $('perfWorkspace'); host.replaceChildren(); host.style.setProperty('--perf-panes', run.options.panes);
+    const panes = [];
+    run.panes = panes;
+    for (let i = 0; i < run.options.panes; i++) {
+      const root = document.createElement('section'), prefix = 'perf' + i + '-';
+      root.className = 'perf-pane'; root.dataset.perfPane = String(i); root.setAttribute('aria-label', '测量栏 ' + (i + 1));
+      // Fixed fixture markup, with the actual overview DOM ids scoped per pane.
+      root.innerHTML = '<section class="overview-stage"><header class="overview-head">' +
+        '<button data-perf-control id="' + prefix + 'btnOverviewBack" hidden>返回</button>' +
+        '<nav id="' + prefix + 'overviewPath"><strong id="' + prefix + 'overviewTitle"></strong></nav>' +
+        '<span class="overview-hint"></span><button data-perf-control id="' + prefix + 'btnOverviewPause">暂停</button>' +
+        '<button data-perf-control id="' + prefix + 'btnOverviewLite">省资源</button></header>' +
+        '<div id="' + prefix + 'overviewScroll" class="overview-scroll" tabindex="-1">' +
+        '<div id="' + prefix + 'overviewSpacer" class="overview-spacer"><div id="' + prefix + 'overviewCards" class="overview-cards"></div></div>' +
+        '<div id="' + prefix + 'overviewEmpty" hidden>空</div></div><footer id="' + prefix + 'overviewStatus" class="overview-status" hidden></footer></section>';
+      host.appendChild(root);
+      const nodes = Array.from({ length: run.options.count }, (_, index) => ({
+        kind: 'entry', _slot: index, _parentKey: 'root', auditEnabled: false,
+        entry: { id: 'ovperf-' + variant + '-' + i + '-' + index, sourceKey: entryKey(i, index), fixtureIndex: index,
+          name: 'structure_' + String(index + 1).padStart(4, '0') + '.pdb', path: 'fixture/' + index + '.pdb', size: pdb.length, format: 'pdb' }
+      }));
+      const counts = { loads: 0, prepares: 0 };
+      const pane = { root, nodes, counts, api: null, scroll: root.querySelector('.overview-scroll'), layer: root.querySelector('.overview-cards'),
+        pause: root.querySelector('#' + prefix + 'btnOverviewPause'), warm: null };
+      panes.push(pane);
+      pane.api = SB_OVERVIEW.create({ root, panePrefix: prefix, key: entry => entry.sourceKey,
+        color: () => '#2f6fad', metric: () => '内置性能数据', liteDefault: () => false, ...generationHooks(run.options.generation, counts) });
+      setPaused(pane, true);
+    }
+    return panes;
+  }
+  function refresh(pane, count) { pane.api.refresh(pane.nodes, true, count + ' 条平铺 · ' + variant); }
+  function assertFlat(pane, count) {
+    const actual = pane.api.nodes();
+    if (actual.length !== count || actual.some(node => node.kind !== 'entry')) throw Error('实际 overview 非预期的平铺节点：需要 ' + count + ' 条 entry');
+    if (!pane.scroll.clientWidth || !pane.scroll.clientHeight) throw Error('overview 测量窗口不可见或尺寸为零');
+  }
+  async function warmMemory(run, panes) {
+    for (const pane of panes) refresh(pane, run.options.count);
+    const began = performance.now();
+    while (true) {
+      check(run);
+      const ready = panes.every(pane => {
+        const images = Array.from(pane.layer.querySelectorAll('.overview-card img'));
+        return images.length > 0 && images.every(image => !image.hidden && image.complete && image.naturalWidth > 0);
+      });
+      if (ready) break;
+      if (performance.now() - began > 1400) throw Error('起始窗口 memory 预热超时，未将未命中状态冒充 memory');
+      await wait(run, 25);
+    }
+    for (const pane of panes) {
+      pane.api.renderWindow();
+      pane.warm = { cacheItems: pane.api.stats.cacheItems, encodedBytes: pane.api.stats.cacheBytes,
+        mountedCards: pane.layer.querySelectorAll('.overview-card').length, generated: pane.api.stats.generated,
+        scope: '仅起始窗口；其余条目仍在已预置磁盘缓存，受实际解码内存预算约束' };
+    }
+  }
+  function cleanupPanes(run) {
+    for (const pane of run.panes || []) {
+      try { if (pane.api) pane.api.destroy(); } catch (error) { run.errors.push('destroy: ' + String(error.message || error)); }
+      pane.root.remove();
+    }
+    run.panes = [];
+  }
+
+  function measure(run, panes, repetition, cachePreparation) {
+    return new Promise((resolve, reject) => {
+      const metrics = panes.map(() => ({ renderWindow: { calls: 0, totalMs: 0, maxMs: 0 }, layoutOf: { calls: 0, totalMs: 0, maxMs: 0 } }));
+      const peak = panes.map(() => ({ mountedCards: 0, visibleCards: 0, mountedElements: 0 }));
+      const sizes = new WeakMap(), intervals = [], tasks = [], baseline = panes.map(pane => ({ generated: pane.api.stats.generated || 0,
+        errors: pane.api.stats.errors || 0, loads: pane.counts.loads, prepares: pane.counts.prepares }));
+      const initialViewport = viewport(), initialDimensions = panes.map(pane => ({ width: pane.scroll.clientWidth, height: pane.scroll.clientHeight }));
+      let observer = null, longTaskSupported = false, raf = 0, previous = null, endTime = null, finished = false, probesMs = 0, domSamples = 0;
+      let mountedPeak = 0, visiblePeak = 0, elementsPeak = 0, firstRafDelay = null;
+      const sampleDOM = () => {
+        const began = performance.now(); let totalMounted = 0, totalVisible = 0, totalElements = 0;
+        for (let i = 0; i < panes.length; i++) {
+          const pane = panes[i], top = pane.scroll.scrollTop, bottom = top + initialDimensions[i].height;
+          let mounted = 0, visible = 0, elements = 0;
+          for (const card of pane.layer.children) {
+            if (!card.classList.contains('overview-card')) continue;
+            mounted++;
+            if (!sizes.has(card)) sizes.set(card, 1 + card.querySelectorAll('*').length);
+            elements += sizes.get(card);
+            const y = parseFloat(card.style.top), x = parseFloat(card.style.left), h = parseFloat(card.style.height), w = parseFloat(card.style.width);
+            if (y < bottom && y + h > top && x < initialDimensions[i].width && x + w > 0 && !card.hidden) visible++;
+          }
+          peak[i].mountedCards = Math.max(peak[i].mountedCards, mounted);
+          peak[i].visibleCards = Math.max(peak[i].visibleCards, visible);
+          peak[i].mountedElements = Math.max(peak[i].mountedElements, elements);
+          totalMounted += mounted; totalVisible += visible; totalElements += elements;
+        }
+        mountedPeak = Math.max(mountedPeak, totalMounted); visiblePeak = Math.max(visiblePeak, totalVisible); elementsPeak = Math.max(elementsPeak, totalElements);
+        domSamples++; probesMs += performance.now() - began;
+      };
+      try {
+        if (window.PerformanceObserver && PerformanceObserver.supportedEntryTypes && PerformanceObserver.supportedEntryTypes.includes('longtask')) {
+          observer = new PerformanceObserver(list => tasks.push(...list.getEntries()));
+          observer.observe({ type: 'longtask', buffered: false }); longTaskSupported = true;
+        }
+      } catch (_) { if (observer) observer.disconnect(); observer = null; }
+      const signal = run.controller.signal, began = performance.now();
+      const collector = { metrics, sampleDOM };
+      live = collector;
+      const release = () => {
+        cancelAnimationFrame(raf); signal.removeEventListener('abort', abort);
+        if (live === collector) live = null;
+      };
+      const fail = error => {
+        if (finished) return; finished = true; release(); if (observer) observer.disconnect(); reject(error);
+      };
+      const abort = () => fail(cancelled());
+      signal.addEventListener('abort', abort, { once: true });
+      async function finish() {
+        if (finished) return;
+        finished = true; endTime = performance.now(); release();
+        const finalStats = panes.map(pane => ({ ...pane.api.stats }));
+        const paneResults = panes.map((pane, i) => {
+          const rect = pane.root.getBoundingClientRect(), layout = geometry.get(pane.root);
+          const functions = {};
+          for (const name of ['renderWindow', 'layoutOf']) {
+            const m = metrics[i][name];
+            functions[name] = { calls: m.calls, totalMs: round(m.totalMs), maxMs: round(m.maxMs), meanMs: m.calls ? round(m.totalMs / m.calls) : 0 };
+          }
+          const stats = finalStats[i];
+          return { pane: i + 1, entries: pane.api.nodes().length, folders: pane.api.nodes().filter(node => node.kind === 'folder').length,
+            paneWidth: round(rect.width), paneHeight: round(rect.height), scrollWidth: initialDimensions[i].width, scrollHeight: initialDimensions[i].height,
+            maxScrollTop: Math.max(0, pane.scroll.scrollHeight - pane.scroll.clientHeight), layout,
+            peak: peak[i], functions, generated: (stats.generated || 0) - baseline[i].generated,
+            generationErrors: (stats.errors || 0) - baseline[i].errors,
+            hookLoads: pane.counts.loads - baseline[i].loads, hookPrepares: pane.counts.prepares - baseline[i].prepares,
+            memoryWarm: pane.warm, cacheAtEnd: { items: stats.cacheItems, encodedBytes: stats.cacheBytes, decodedBytesEstimated: stats.decodedCacheBytes }, stats };
+        });
+        try {
+          // Deliver the last completed task entry after the timing window, without extending it.
+          await wait(run, 0);
+          if (observer) { tasks.push(...observer.takeRecords()); observer.disconnect(); }
+          check(run);
+          const filtered = tasks.filter(task => task.duration > 50 && task.startTime >= began && task.startTime < endTime);
+          const result = { repetition, viewport: initialViewport, actualDurationMs: round(endTime - began), targetDurationMs: REPETITION_MS,
+            samples: intervals.length, firstRafDelayMs: round(firstRafDelay || 0), raf: { p95Ms: percentile(intervals, .95), maxMs: intervals.length ? round(Math.max(...intervals)) : null,
+              meanMs: intervals.length ? round(intervals.reduce((a, b) => a + b, 0) / intervals.length) : null, intervalsMs: intervals.map(round) },
+            longTasks: { supported: longTaskSupported, thresholdMs: 50, count: longTaskSupported ? filtered.length : null,
+              durationMs: longTaskSupported ? round(filtered.reduce((total, task) => total + task.duration, 0)) : null,
+              entries: filtered.map(task => ({ startOffsetMs: round(task.startTime - began), durationMs: round(task.duration) })) },
+            mountedDOMPeak: mountedPeak, visibleDOMPeak: visiblePeak, mountedElementsPeak: elementsPeak,
+            domProbe: { samples: domSamples, totalMs: round(probesMs), method: '每个 rAF 及真实 renderWindow 返回后读取实际卡片 DOM；可见性按实际 inline 几何与 scroll viewport 相交；元素子树数量在首次挂载采样' },
+            generated: paneResults.reduce((n, pane) => n + pane.generated, 0), cachePreparation, panes: paneResults,
+            trajectory: { type: 'time-based uniform triangle, same normalized phase for both panes', dwellStartMs: DWELL_MS, downMs: SCROLL_MS / 2,
+              upMs: SCROLL_MS / 2, dwellEndMs: DWELL_MS, distance: '每栏实际 scrollHeight - clientHeight；scrollTop 写入触发原生 scroll，不直接驱动布局' } };
+          resolve(result);
+        } catch (error) { if (observer) observer.disconnect(); reject(error); }
+      }
+      const frame = time => {
+        if (finished) return;
+        try {
+          check(run);
+          if (document.hidden) throw Error('测量期间标签页不在前台');
+          const nowViewport = viewport();
+          if (nowViewport.width !== initialViewport.width || nowViewport.height !== initialViewport.height || nowViewport.devicePixelRatio !== initialViewport.devicePixelRatio || nowViewport.visualScale !== initialViewport.visualScale)
+            throw Error('测量期间视口或缩放变化，结果无效');
+          if (previous !== null && time > previous) intervals.push(time - previous);
+          else if (previous === null) firstRafDelay = performance.now() - began;
+          previous = time;
+          const elapsed = Math.max(0, time - began), phase = Math.max(0, Math.min(1, (elapsed - DWELL_MS) / SCROLL_MS));
+          const position = phase <= .5 ? 2 * phase : 2 * (1 - phase);
+          for (let i = 0; i < panes.length; i++) {
+            const pane = panes[i];
+            if (pane.scroll.clientWidth !== initialDimensions[i].width || pane.scroll.clientHeight !== initialDimensions[i].height) throw Error('测量期间栏尺寸变化，结果无效');
+            pane.scroll.scrollTop = Math.max(0, pane.scroll.scrollHeight - pane.scroll.clientHeight) * position;
+          }
+          sampleDOM();
+          if (elapsed >= REPETITION_MS) void finish(); else raf = requestAnimationFrame(frame);
+        } catch (error) { fail(error); }
+      };
+      try {
+        check(run);
+        for (const pane of panes) {
+          refresh(pane, run.options.count); assertFlat(pane, run.options.count);
+          if (run.options.generation !== 'paused') setPaused(pane, false);
+        }
+        sampleDOM(); raf = requestAnimationFrame(frame);
+      } catch (error) { fail(error); }
+    });
+  }
+
+  function summarize(results) {
+    const total = (key, name) => results.reduce((n, result) => n + result.panes.reduce((m, pane) => m + pane.functions[key][name], 0), 0);
+    return { completedRepetitions: results.length, samples: results.reduce((n, result) => n + result.samples, 0),
+      rafP95MedianMs: median(results.map(result => result.raf.p95Ms)),
+      longTaskCount: results.every(result => result.longTasks.supported) ? results.reduce((n, result) => n + result.longTasks.count, 0) : null,
+      longTaskDurationMs: results.every(result => result.longTasks.supported) ? round(results.reduce((n, result) => n + result.longTasks.durationMs, 0)) : null,
+      mountedDOMPeak: results.length ? Math.max(...results.map(result => result.mountedDOMPeak)) : 0,
+      visibleDOMPeak: results.length ? Math.max(...results.map(result => result.visibleDOMPeak)) : 0,
+      generated: results.reduce((n, result) => n + result.generated, 0),
+      renderWindow: { calls: total('renderWindow', 'calls'), totalMs: round(total('renderWindow', 'totalMs')) },
+      layoutOf: { calls: total('layoutOf', 'calls'), totalMs: round(total('layoutOf', 'totalMs')) } };
+  }
+  function renderFinal(report) {
+    $('perfOutput').textContent = JSON.stringify(report, null, 2);
+    const table = $('perfSummary'); table.replaceChildren();
+    if (!report.repetitions.length) return;
+    const caption = document.createElement('caption');
+    caption.textContent = report.variant + ' · 每栏 ' + report.options.count + ' 条 × ' + report.options.panes + ' 栏 · ' + report.options.cache + ' · ' + report.options.generation;
+    table.appendChild(caption);
+    const head = table.createTHead().insertRow();
+    for (const text of ['次数', '样本', 'rAF p95', '>50ms 长任务 / 时长', 'DOM 挂载 / 可见峰值', 'renderWindow 次 / ms', 'layoutOf 次 / ms', 'generated']) {
+      const th = document.createElement('th'); th.textContent = text; th.scope = 'col'; head.appendChild(th);
+    }
+    const body = table.createTBody();
+    for (const result of report.repetitions) {
+      const sum = summarize([result]), row = body.insertRow();
+      const values = [result.repetition, result.samples, result.raf.p95Ms + ' ms',
+        result.longTasks.supported ? result.longTasks.count + ' / ' + result.longTasks.durationMs + ' ms' : '不支持',
+        result.mountedDOMPeak + ' / ' + result.visibleDOMPeak,
+        sum.renderWindow.calls + ' / ' + sum.renderWindow.totalMs, sum.layoutOf.calls + ' / ' + sum.layoutOf.totalMs, result.generated];
+      for (const value of values) row.insertCell().textContent = String(value);
+    }
+  }
+  function updateControls(busy) {
+    for (const node of $('perfForm').querySelectorAll('select, #perfStart')) node.disabled = busy || disposed;
+    $('perfCancel').disabled = !busy || disposed;
+    $('perfDestroy').disabled = disposed;
+    $('perfWorkspace').classList.toggle('is-running', busy);
+  }
+  function options(input) {
+    const value = { count: 1000, panes: 1, cache: 'cold', generation: 'paused', repeat: 3, ...input };
+    if (![100, 1000].includes(value.count) || ![1, 2].includes(value.panes) || !['cold', 'memory', 'disk'].includes(value.cache) ||
+      !['paused', 'synthetic', 'real'].includes(value.generation) || !Number.isInteger(value.repeat) || value.repeat < 1 || value.repeat > 3)
+      throw Error('参数必须为 count:100|1000, panes:1|2, cache:cold|memory|disk, generation:paused|synthetic|real, repeat:1..3');
+    return { count: value.count, panes: value.panes, cache: value.cache, generation: value.generation, repeat: value.repeat };
+  }
+  async function execute(run) {
+    const repetitions = [], started = performance.now();
+    let status = 'completed', message = null, instrumentation = null;
+    const onHidden = () => { if (live && document.hidden) { run.invalidReason = '测量期间标签页进入后台'; run.controller.abort(); } };
+    const watchdog = setTimeout(() => { run.invalidReason = '整组超过 25 秒，已终止；阶段：' + run.phase; run.controller.abort(); }, 25000);
+    document.addEventListener('visibilitychange', onHidden);
+    try {
+      run.status = 'running'; run.phase = 'loading'; check(run);
+      instrumentation = await loadOverview(run);
+      if (run.options.generation === 'real') await ensureMolstar(run);
+      for (let index = 0; index < run.options.repeat; index++) {
+        check(run); run.phase = 'preparing-cache'; run.repetition = index + 1;
+        const preparationBegan = performance.now(), cachePreparation = await prepareCache(run);
+        check(run); run.phase = 'mounting';
+        const panes = mountPanes(run);
+        try {
+          run.phase = 'waiting-first-frame'; await nextFrame(run);
+          run.phase = 'waiting-second-frame'; await nextFrame(run);
+          if (run.options.cache === 'memory') { run.phase = 'warming-memory'; await warmMemory(run, panes); }
+          cachePreparation.preparationMs = round(performance.now() - preparationBegan);
+          run.phase = 'measuring'; run.repetition = index + 1;
+          const measured = await measure(run, panes, index + 1, cachePreparation);
+          repetitions.push(measured); run.completedRepetitions = repetitions.length;
+        } finally { cleanupPanes(run); }
+      }
+    } catch (error) {
+      status = run.invalidReason ? 'invalid' : run.controller.signal.aborted || disposed ? 'cancelled' : 'failed';
+      message = run.invalidReason || String(error.message || error);
+    } finally {
+      clearTimeout(watchdog); document.removeEventListener('visibilitychange', onHidden); live = null; cleanupPanes(run);
+      const warnings = [];
+      if (run.options.generation !== 'paused' && repetitions.length && repetitions.every(result => result.generated === 0)) warnings.push('本组 generated 为 0；结果只反映此轨迹下实际调度，不代表生成吞吐量');
+      if (repetitions.some(result => result.panes.some(pane => pane.generationErrors > 0))) warnings.push('实际生成器有错误；检查每栏 generationErrors 和 stats');
+      if (repetitions.some(result => !result.longTasks.supported)) warnings.push('当前浏览器不提供 Long Tasks API，数量和时长为 null');
+      if (run.options.cache === 'memory') warnings.push('memory 为起始窗口预热，1000 条并非全量内存命中');
+      const report = { schema: 'structboard-overview-performance/v1', runId: run.id, status, message, variant, options: run.options,
+        totalEntries: run.options.count * run.options.panes, countMeaning: 'count 为每栏实际 entry 数；没有 folder / localfile 聚合',
+        startedAt: run.startedAt, totalMs: round(performance.now() - started), userAgent: navigator.userAgent,
+        instrumentation, viewport: repetitions.length ? repetitions[0].viewport : viewport(), repetitions, summary: summarize(repetitions),
+        warnings, errors: run.errors,
+        limitations: ['只操作验收专用 IndexedDB / localStorage；同 variant 不应同时运行两个验收页',
+          '测量包括实际 DOM、图片解码、缓存、调度和同步插桩开销；不代表无探针的绝对时间',
+          'rAF 是页面回调间隔，不是 GPU 帧耗时；Long Tasks 为当前页面全部 >50ms 主线程任务，按任务开始时间归入测量窗口',
+          'mountedDOMPeak / visibleDOMPeak 均以实际 .overview-card 元素为单位；mountedElementsPeak 额外统计卡片子树元素（包含隐藏子元素）',
+          'synthetic 不代表 Mol* 或真实 GPU 成本；real 只使用内置 12 个 CA 原子小型 PDB，不读取用户结构',
+          'warm cache 为合成图片；memory 预热实际起始窗口，其余条目留在磁盘，三模式同 key 覆盖',
+          'real 首次加载与预热、慢速设备会使整组超过约 10 秒；25 秒上限会终止本组',
+          '需要允许同 origin fetch、Blob 脚本及 IndexedDB；已知函数签名变化时明确失败，不产生伪造计数'] };
+      run.report = report; run.status = status; run.phase = status;
+      if (currentRun === run) {
+        updateControls(false); renderFinal(report);
+        $('perfStatus').textContent = status === 'completed' ? '完成 ' + repetitions.length + ' 次 · ' + round(report.totalMs / 1000) + ' 秒。结果仅在此时输出。' :
+          (status === 'cancelled' ? '已取消。' : '未完成：') + (message || status) + ' 已完成的重复保留在结果中。';
+      }
+    }
+  }
+  function start(input = {}) {
+    if (disposed) throw Error('验收页已 destroy，请重新加载页面');
+    if (currentRun && ['queued', 'running', 'cancelling'].includes(currentRun.status)) throw Error('已有一组正在运行；先 cancel 并等待 state() 结束');
+    const config = options(input), id = 'ovperf-' + variant + '-' + Date.now().toString(36) + '-' + (++sequence);
+    const run = { id, options: config, controller: new AbortController(), status: 'queued', phase: 'queued', repetition: 0,
+      completedRepetitions: 0, startedAt: new Date().toISOString(), clock: performance.now(), report: null, errors: [], panes: [] };
+    currentRun = run; history.set(id, run);
+    while (history.size > 6) history.delete(history.keys().next().value);
+    $('perfSummary').replaceChildren(); $('perfOutput').textContent = '等待最终结果';
+    $('perfStatus').textContent = '正在运行 ' + variant + ' · ' + config.repeat + ' 次；保持前台和视口不变。';
+    updateControls(true);
+    Promise.resolve().then(() => execute(run));
+    return id;
+  }
+  function state(id) {
+    const run = id ? history.get(id) : currentRun;
+    if (!run) return { status: disposed ? 'destroyed' : 'idle', variant };
+    return { runId: run.id, status: run.status, phase: run.phase, variant, repetition: run.repetition, completedRepetitions: run.completedRepetitions,
+      repeat: run.options.repeat, elapsedMs: run.report ? run.report.totalMs : round(performance.now() - run.clock), destroyed: disposed };
+  }
+  function result(id) { const run = id ? history.get(id) : currentRun; return run ? copy(run.report) : null; }
+  function cancel(id) {
+    const run = id ? history.get(id) : currentRun;
+    if (!run || !['queued', 'running', 'cancelling'].includes(run.status)) return false;
+    run.status = 'cancelling'; run.controller.abort(); cleanupPanes(run); return true;
+  }
+  function destroy() {
+    if (disposed) return;
+    cancel(); disposed = true; live = null;
+    if (currentRun) cleanupPanes(currentRun);
+    updateControls(false); $('perfWorkspace').replaceChildren();
+    $('thumbnailHost').replaceChildren();
+    if (!currentRun || currentRun.report) $('perfStatus').textContent = '资源已释放，重新加载页面可再运行。';
+  }
+  window.__OV_PERF__ = Object.freeze({ version: 1, variant, start, state, result, cancel, destroy });
+  $('perfForm').addEventListener('submit', event => {
+    event.preventDefault();
+    try { start({ count: Number($('perfCount').value), panes: Number($('perfPanes').value), cache: $('perfCache').value,
+      generation: $('perfGeneration').value, repeat: Number($('perfRepeat').value) }); }
+    catch (error) { $('perfStatus').textContent = String(error.message || error); }
+  });
+  $('perfCancel').addEventListener('click', () => cancel());
+  $('perfDestroy').addEventListener('click', destroy);
+  window.addEventListener('pagehide', destroy, { once: true });
+})();
+</script>
+</body>
+</html>

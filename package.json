@@ -1,0 +1,20 @@
+{
+  "name": "structboard-ui",
+  "version": "0.3.0",
+  "private": true,
+  "scripts": {
+    "build:ui": "vite build --config frontend/vite.config.mjs",
+    "check:ui": "node tools/check_frontend_build.mjs",
+    "test:ui": "node --test frontend/tests/*.test.mjs",
+    "test:browser": "playwright test --config frontend/playwright.config.mjs"
+  },
+  "dependencies": {
+    "vue": "3.5.45"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "6.0.11",
+    "vite": "8.3.8",
+    "@playwright/test": "1.65.1"
+  },
+  "license": "GPL-3.0-only"
+}

@@ -1,0 +1,42 @@
+[package]
+name = "structboard-desktop"
+version = "0.3.0"
+edition = "2021"
+license = "GPL-3.0-only"
+
+[[bin]]
+name = "StructBoard"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["devtools", "image-ico", "image-png"] }
+tauri-plugin-single-instance = "2"
+tauri-plugin-window-state = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+getrandom = "0.3"
+arboard = { version = "3", default-features = false }
+# WebView2 131 的 IFileOpenDialog 在无边框窗口上必崩（WebView2Feedback #4648）：
+# 文件/文件夹选择一律走 rfd（Rust 进程弹系统 IFileDialog），不进 WebView2 的对话框管线。
+rfd = "0.15"
+
+# Win10 无 DWM 圆角：用 SetWindowRgn 把 HWND 裁成圆角，去掉 CSS 圆角外的灰/黑方角
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Gdi",
+  "Win32_UI_WindowsAndMessaging",
+] }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
+opt-level = "s"

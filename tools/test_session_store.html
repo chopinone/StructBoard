@@ -1,0 +1,199 @@
+<!doctype html><html lang="zh"><meta charset="utf-8"><title>会话存储回归测试</title><body><pre id="result">运行中</pre><script src="../session_store.js"></script><script>
+(async function () {
+  const checks = [];
+  const assert = function (ok, name) { if (!ok) throw Error(name); checks.push(name); };
+  const name = 'structboard_session_test_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+  const store = SB_SESSION_STORE.create(indexedDB, name);
+  const backupKey = SB_SESSION_STORE.IMPORT_BACKUP_KEY;
+  const membershipKey = 'snapshot.before-membership-v2';
+  const same = function (a, b) { return JSON.stringify(a) === JSON.stringify(b); };
+  function inspect(work, mode) {
+    return new Promise(function (resolve, reject) {
+      const req = indexedDB.open(name, SB_SESSION_STORE.VERSION);
+      req.onerror = function () { reject(req.error); };
+      req.onsuccess = function () {
+        const db = req.result, tx = db.transaction(['kv', 'entry-data'], mode || 'readonly');
+        const result = work(tx);
+        tx.oncomplete = function () { db.close(); resolve(result && result.result); };
+        tx.onabort = function () { db.close(); reject(tx.error || Error('测试事务中断')); };
+      };
+    });
+  }
+  const stored = function (key) { return inspect(function (tx) { return tx.objectStore('kv').get(key); }); };
+  function bodyKeys() {
+    return inspect(function (tx) { return tx.objectStore('entry-data').getAllKeys(); });
+  }
+  function failOnWrite(key) {
+    return { open: function () {
+      const req = indexedDB.open.apply(indexedDB, arguments), wrapper = {};
+      req.onupgradeneeded = function () { if (wrapper.onupgradeneeded) wrapper.onupgradeneeded(); };
+      req.onerror = function () { wrapper.error = req.error; if (wrapper.onerror) wrapper.onerror(); };
+      req.onsuccess = function () {
+        const db = req.result;
+        wrapper.result = { close: function () { db.close(); }, transaction: function (names, mode) {
+          const tx = db.transaction(names, mode);
+          if (mode === 'readwrite') {
+            const nativeStore = tx.objectStore.bind(tx);
+            tx.objectStore = function (storeName) {
+              const obj = nativeStore(storeName), put = obj.put.bind(obj);
+              obj.put = function (value, recordKey) {
+                const request = put(value, recordKey);
+                if (storeName === 'kv' && recordKey === key) request.onsuccess = function () { tx.abort(); };
+                return request;
+              };
+              return obj;
+            };
+          }
+          return tx;
+        } };
+        if (wrapper.onsuccess) wrapper.onsuccess();
+      };
+      return wrapper;
+    } };
+  }
+  try {
+    // Legacy snapshots must still restore before a v2 save.
+    await new Promise(function (resolve, reject) {
+      const req = indexedDB.open(name, 1);
+      req.onupgradeneeded = function () { req.result.createObjectStore('kv'); };
+      req.onsuccess = function () {
+        const db = req.result, tx = db.transaction('kv', 'readwrite');
+        tx.objectStore('kv').put({ entries: [{ name: 'legacy.pdb', data: 'legacy', sourceKey: 'old' }], organization: {} }, 'snapshot');
+        tx.oncomplete = function () { db.close(); resolve(); };
+        tx.onerror = reject;
+      };
+      req.onerror = reject;
+    });
+    assert((await store.load()).entries[0].data === 'legacy', '旧版快照兼容');
+    const large = 'x'.repeat(121 * 1024 * 1024);
+    const input = { entries: [
+      { name: 'large.pdb', data: large, sourceKey: 'local-large', fileKey: 'large' },
+      { name: 'lazy.pdb', data: '', lazy: true, sourceKey: 'p:stage_alpha:file', stepKey: 'p:stage_alpha', fetchUrl: '/unused' },
+      { name: 'lazy.pdb', data: '', lazy: true, sourceKey: 'p:stage_beta:file', stepKey: 'p:stage_beta', fetchUrl: '/unused' }
+    ], groups: [{ name: 'alpha', keys: ['p:stage_alpha:file'] }, { name: 'beta', keys: ['p:stage_beta:file'] }],
+      organization: { 'p:stage_alpha': { folders: [{ id: 'folder', name: '保留' }], placements: {}, notes: { folder: '便签' } } },
+      customSteps: [{ key: 'custom', title: '空步骤' }], membershipVersion: 2 };
+    await store.save(input);
+    const saved = await store.load();
+    assert(saved.entries.length === 3, '超过120MiB不截断后续条目');
+    assert(saved.entries[0].data.length === large.length, '本地结构正文完整');
+    assert(saved.entries[1].stepKey !== saved.entries[2].stepKey, '跨步骤成员隔离');
+    assert(saved.groups.length === 2 && saved.customSteps.length === 1, '分组和空步骤完整');
+    assert(saved.organization['p:stage_alpha'].notes.folder === '便签', '组织和便签完整');
+    assert((await store.load('snapshot.previous')).entries[0].data === 'legacy', '保留上一份快照');
+    // Abort a real IDB transaction after writes; it must not replace the current snapshot.
+    let failed = false;
+    try { await SB_SESSION_STORE.create(failOnWrite('snapshot'), name).save({ entries: [{ name: 'bad', data: 'broken' }] }); }
+    catch (_) { failed = true; }
+    assert(failed, '事务中断返回失败');
+    assert((await store.load()).entries.length === 3, '失败不覆盖现有快照');
+    await store.save({ entries: [{ name: 'small', data: 'new' }], organization: {} });
+    assert((await store.load('snapshot.previous')).entries[0].data.length === large.length, '上一份快照正文仍可恢复');
+
+    assert(backupKey === 'snapshot.before-pipeline-import', '导入前备份使用约定独立键');
+    const currentBefore = await stored('snapshot'), previousBefore = await stored('snapshot.previous');
+    await inspect(function (tx) {
+      tx.objectStore('kv').put({ entries: [{ name: 'membership.pdb', data: '', dataRef: 'membership-body' }] }, membershipKey);
+      tx.objectStore('entry-data').put('membership-local', 'membership-body');
+    }, 'readwrite');
+    const beforeImport = { entries: [
+      { name: 'local.pdb', data: 'LOCAL BEFORE IMPORT', sourceKey: 'local:before' },
+      { name: 'binary.bcif', data: new Uint8Array([0, 17, 255]), sourceKey: 'local:binary' },
+      { name: 'remote.pdb', data: '', lazy: true, fetchUrl: '/unused', sourceKey: 'remote:before' }
+    ], organization: { before: { notes: { folder: '导入前便签' } } }, membershipVersion: 2 };
+    const inputBefore = JSON.stringify(beforeImport);
+    await store.backupBeforeImport(beforeImport);
+    let backup = await store.load(backupKey), rawBackup = await stored(backupKey);
+    assert(backup.entries[0].data === 'LOCAL BEFORE IMPORT', '导入前本地正文可完整恢复');
+    assert(backup.entries[1].data instanceof Uint8Array && same(Array.from(backup.entries[1].data), [0, 17, 255]), '导入前二进制正文可完整恢复');
+    assert(rawBackup.entries[0].data === '' && !!rawBackup.entries[0].dataRef && rawBackup.entries[1].data === '', '备份正文独立打包');
+    assert(backup.entries[2].lazy && !backup.entries[2].dataRef && backup.organization.before.notes.folder === '导入前便签', '备份保留延迟条目与组织数据');
+    assert(JSON.stringify(beforeImport) === inputBefore, '备份不修改传入快照');
+    assert(same(await stored('snapshot'), currentBefore) && same(await stored('snapshot.previous'), previousBefore), '备份不改当前或previous快照');
+    const oldRefs = rawBackup.entries.map(function (e) { return e.dataRef; }).filter(Boolean);
+    const replacement = { entries: [{ name: 'replacement.pdb', data: 'REPLACEMENT BODY' }], customSteps: [{ key: 'before', title: '备份空步骤' }] };
+    await store.backupBeforeImport(replacement);
+    assert((await store.load(backupKey)).entries[0].data === 'REPLACEMENT BODY', '重复备份可覆盖上次导入前备份');
+
+    const oldBackup = await stored(backupKey), keysBeforeFailure = await bodyKeys();
+    const failingBackupStore = SB_SESSION_STORE.create(failOnWrite(backupKey), name);
+    failed = false;
+    try { await failingBackupStore.backupBeforeImport({ entries: [{ name: 'bad-backup', data: 'BROKEN BACKUP' }] }); }
+    catch (_) { failed = true; }
+    assert(failed, '备份事务中断必须reject');
+    assert(same(await stored('snapshot'), currentBefore) && same(await stored('snapshot.previous'), previousBefore), '备份中断不破坏当前或previous快照');
+    assert(same(await stored(backupKey), oldBackup) && (await store.load(backupKey)).entries[0].data === 'REPLACEMENT BODY', '备份中断不破坏旧备份及正文');
+    assert(same(await bodyKeys(), keysBeforeFailure), '备份中断回滚已排队正文写入');
+    failed = false;
+    try { await store.backupBeforeImport({ entries: [{ name: 'bad-clone', data: 'ORPHAN BODY' }], invalid: function () {} }); }
+    catch (_) { failed = true; }
+    assert(failed && same(await bodyKeys(), keysBeforeFailure), '备份同步写入异常reject并回滚正文');
+    assert(same(await stored(backupKey), oldBackup) && same(await stored('snapshot'), currentBefore) && same(await stored('snapshot.previous'), previousBefore), '同步失败保留全部原快照');
+    assert((await store.load()).entries[0].data === 'new' && (await store.load('snapshot.previous')).entries[0].data.length === large.length, '备份失败后当前与previous正文仍完整可读');
+    const unavailable = SB_SESSION_STORE.create(null, name);
+    failed = false;
+    try { await unavailable.backupBeforeImport(replacement); }
+    catch (_) { failed = true; }
+    assert(failed, '备份无法打开存储时reject');
+    const queuedSave = store.save({ entries: [{ name: 'queued', data: 'QUEUED CURRENT' }] });
+    const queuedInput = { entries: [{ name: 'queued-backup', data: 'before queue runs' }], groups: [{ name: '保留分组', keys: ['local:queued'] }], organization: { before: { notes: { folder: '队列备份便签' } } }, customSteps: [{ key: 'empty', title: '空步骤' }] };
+    const queuedBackup = store.backupBeforeImport(queuedInput);
+    queuedInput.entries[0].data = 'PACKED INSIDE QUEUE';
+    await Promise.all([queuedSave, queuedBackup]);
+    assert((await store.load(backupKey)).entries[0].data === 'PACKED INSIDE QUEUE', '备份在串行队列内部打包正文');
+    assert((await store.load()).entries[0].data === 'QUEUED CURRENT' && (await store.load('snapshot.previous')).entries[0].data === 'new', '排队备份不参与save的previous轮换');
+    const stableBackup = await stored(backupKey), stableLoadedBackup = await store.load(backupKey);
+    await store.save({ entries: [{ name: 'auto-one', data: 'AUTO ONE' }] });
+    await store.save({ entries: [{ name: 'auto-two', data: 'AUTO TWO' }] });
+    backup = await store.load(backupKey);
+    assert(same(backup, stableLoadedBackup) && same(await stored(backupKey), stableBackup), '普通save两次不能覆盖独立备份或回收其正文');
+    assert((await store.load()).entries[0].data === 'AUTO TWO' && (await store.load('snapshot.previous')).entries[0].data === 'AUTO ONE', '普通save继续维护previous正文');
+    assert((await store.load(membershipKey)).entries[0].data === 'membership-local', '普通save同时保留membership-v2备份正文');
+    const keysAfterSave = await bodyKeys();
+    assert(oldRefs.every(function (key) { return !keysAfterSave.includes(key); }), '普通save回收被覆盖备份的无用正文');
+    const beforeSwitch = { entries: [{ name: 'before-switch', data: 'UNSAVED LOCAL BODY' }] };
+    const nextWorkspace = { entries: [{ name: 'next-workspace', data: 'NEW WORKSPACE' }] };
+    const previousAtSwitch = await stored('snapshot.previous');
+    for (const key of [backupKey, 'snapshot']) {
+      failed = false;
+      try { await SB_SESSION_STORE.create(failOnWrite(key), name).save(nextWorkspace, { beforeImport: beforeSwitch }); }
+      catch (_) { failed = true; }
+      assert(failed && (await store.load()).entries[0].data === 'AUTO TWO', '任一快照写入失败都保留旧工作区');
+      assert(same(await stored('snapshot.previous'), previousAtSwitch) && same(await stored(backupKey), stableBackup), '任一快照写入失败都保留历史快照');
+    }
+    failed = false;
+    try { await store.save(nextWorkspace, { beforeImport: beforeSwitch, check: function () { throw Error('workspace changed'); } }); }
+    catch (_) { failed = true; }
+    assert(failed && same(await bodyKeys(), keysAfterSave), '过期导入不能提交或遗留结构正文');
+    await store.save(nextWorkspace, { beforeImport: beforeSwitch });
+    assert((await store.load()).entries[0].data === 'NEW WORKSPACE', '原子切换储存新工作区');
+    assert((await store.load(backupKey)).entries[0].data === 'UNSAVED LOCAL BODY', '原子切换备份完整旧正文');
+    const switchedBackup = await stored(backupKey);
+    await store.save(nextWorkspace);
+    assert(same(await stored(backupKey), switchedBackup), '自动保存不能覆盖原子切换备份');
+    await store.clear();
+    assert(await store.load() === null && await store.load('snapshot.previous') === null, '清理工作区和previous生效');
+    assert((await store.load(backupKey)).entries[0].data === 'UNSAVED LOCAL BODY' && same(await stored(backupKey), switchedBackup), 'clear后独立导入备份仍完整可读');
+    assert((await store.load(membershipKey)).entries[0].data === 'membership-local', 'clear同时保留membership-v2备份正文');
+    const retained = (await bodyKeys()).sort();
+    assert(same(retained, ['membership-body', switchedBackup.entries[0].dataRef].sort()), 'GC仅保留两种独立备份仍引用的正文');
+    const firstTabKey = 'workspace:main:pipeline-a', secondTabKey = 'workspace:main:pipeline-b';
+    store.setKey(firstTabKey);
+    await store.save({ entries: [{ name: 'pipeline-a.pdb', data: 'PIPELINE A BODY' }] });
+    store.setKey(secondTabKey);
+    await store.save({ entries: [{ name: 'pipeline-b.pdb', data: 'PIPELINE B BODY' }] });
+    store.setKey(firstTabKey);
+    await store.save({ entries: [{ name: 'pipeline-a-edited.pdb', data: 'PIPELINE A UPDATED' }] });
+    assert((await store.load(firstTabKey)).entries[0].data === 'PIPELINE A UPDATED', 'keyed save/load keeps active pipeline workspace');
+    assert((await store.load(secondTabKey)).entries[0].data === 'PIPELINE B BODY', 'saving another tab preserves its structure bodies');
+    await store.clear();
+    assert(await store.load(firstTabKey) === null, 'clear removes only the selected workspace key');
+    assert((await store.load(secondTabKey)).entries[0].data === 'PIPELINE B BODY', 'clear preserves other pipeline snapshots and bodies');
+    document.getElementById('result').textContent = JSON.stringify({ ok: true, checks: checks }, null, 2);
+    document.documentElement.dataset.testResult = 'pass';
+  } catch (error) {
+    document.getElementById('result').textContent = JSON.stringify({ ok: false, checks: checks, error: error.stack || String(error) }, null, 2);
+    document.documentElement.dataset.testResult = 'fail';
+  } finally { indexedDB.deleteDatabase(name); }
+})();
+</script></body></html>

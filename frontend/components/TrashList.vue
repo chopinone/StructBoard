@@ -1,0 +1,2 @@
+<script setup>defineProps({model:{type:Object,required:true},handlers:{type:Object,required:true}});</script>
+<template><article v-for="item in model.items" :key="item.id" class="trash-row"><span class="trash-row-icon">♻</span><div class="trash-row-body"><strong>{{ item.label }}</strong><span>{{ item.meta }}</span></div><button class="mini-btn" @click="handlers.restore(item.id)">还原</button></article></template>

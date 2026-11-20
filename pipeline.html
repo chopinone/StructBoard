@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>设计管线 · StructBoard</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%237a5cff'/%3E%3Cpath d='M6 10h6v6h8v6h6' fill='none' stroke='white' stroke-width='2.4'/%3E%3C/svg%3E" />
+<style>
+:root{
+  --bg:transparent;--panel:rgba(246,247,248,.6);--panel-solid:rgba(250,251,252,.94);--panel2:rgba(0,0,0,.05);--line:rgba(0,0,0,.085);--line2:rgba(0,0,0,.16);
+  --text:#1d1d1f;--text2:rgba(60,60,67,.72);--text3:rgba(60,60,67,.38);
+  --accent:#007aff;--accent-soft:rgba(0,122,255,.12);
+  --r0:#6b7f3a;--r1:#2f6fad;--r2:#9a63b8;--final:#d19a2c;
+  --ok:#34c759;--ok-soft:rgba(52,199,89,.13);--warn:#ff3b30;--warn-soft:rgba(255,59,48,.1);
+  --shadow:0 1px 1px rgba(0,0,0,.04);
+  --blur:saturate(180%) blur(30px);
+  --ease:cubic-bezier(.32,.72,.24,1);
+  --spring:cubic-bezier(.22,1,.36,1);
+  --ease-apple:cubic-bezier(.32,.72,0,1);
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;overflow:hidden;background:transparent}
+body{background:transparent;color:var(--text);font:13px/1.5 -apple-system,"SF Pro Text","Segoe UI Variable Text","Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;-webkit-font-smoothing:antialiased}
+button,input,textarea,select{font-family:inherit;font-size:12px}
+button{cursor:pointer}
+.spacer{flex:1;min-width:0}
+[hidden]{display:none!important}
+.mono{font-family:Consolas,"SF Mono",Menlo,monospace;font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion: reduce){*,:before,:after{transition-duration:.01ms!important;animation-duration:.01ms!important}}
+
+.app{display:flex;flex-direction:column;height:100%}
+.appbar{height:46px;flex:none;display:flex;align-items:center;gap:10px;padding:0 12px;background:var(--panel);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border-bottom:1px solid var(--line);z-index:6}
+.brand{display:flex;align-items:center;gap:8px;padding-right:10px;border-right:1px solid var(--line);flex:none;white-space:nowrap}
+.brand-mark{font-size:18px;color:var(--accent);flex:none}
+.brand-t{display:flex;align-items:baseline;gap:7px;line-height:1.2;white-space:nowrap}
+.brand-t b{font-size:13px;font-weight:600;white-space:nowrap}
+.brand-t small{font-size:10.5px;color:var(--text3);white-space:nowrap}
+@media(max-width:1120px){.brand-t small{display:none}}
+.tabbar{display:flex;gap:2px;padding:2px;background:rgba(120,120,128,.14);border-radius:8px}
+.tab{height:24px;padding:0 11px;border:0;border-radius:6px;background:transparent;color:var(--text2);font-size:11.5px;white-space:nowrap}
+.tab.active{background:rgba(255,255,255,.92);color:var(--text);font-weight:600;box-shadow:0 1px 2.5px rgba(0,0,0,.12)}
+body.dark .tab.active{background:rgba(99,99,102,.9);color:var(--text)}
+.picker{height:24px;max-width:220px;padding:0 6px;border:1px solid var(--line2);border-radius:5px;background:#fff;color:var(--text);font-size:11.5px}
+.picker:disabled{color:var(--text3);background:#f6f7f8}
+.node.api{--nc:#2f6fad}
+.btn{height:28px;padding:0 11px;border:1px solid var(--line2);border-radius:7px;background:linear-gradient(180deg,rgba(255,255,255,.85),rgba(250,250,250,.8));color:var(--text);font-size:11.5px;white-space:nowrap;box-shadow:0 .5px 1.5px rgba(0,0,0,.06);transition:all .15s var(--ease)}
+body.dark .btn{background:linear-gradient(180deg,rgba(110,111,118,.5),rgba(92,93,100,.45))}
+.btn:hover{background:var(--hover-strong,rgba(0,0,0,.09))}
+body.dark .btn:hover{background:rgba(120,120,128,.32)}
+.btn:active{filter:brightness(.94)}
+.btn.primary{background:var(--accent);border-color:rgba(0,0,0,.08);color:#fff;box-shadow:0 .5px 2px rgba(0,100,220,.3)}
+.btn.primary:hover{background:var(--accent-2,#0071e3)}
+.mini{height:24px;padding:0 8px;border:1px solid var(--line2);border-radius:6px;background:rgba(255,255,255,.7);color:var(--text2);font-size:11px;white-space:nowrap;transition:all .14s var(--ease)}
+body.dark .mini{background:rgba(120,120,128,.18)}
+.mini:hover{border-color:var(--accent);color:var(--accent)}
+.mini.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.zoom{display:flex;align-items:center;gap:2px;padding:2px;background:rgba(255,255,255,.75);border:1px solid var(--line2);border-radius:7px}
+body.dark .zoom{background:rgba(120,120,128,.18)}
+.zoom button{width:24px;height:22px;border:0;border-radius:5px;background:transparent;color:var(--text2);font-size:13px}
+.zoom button:hover{background:var(--hover,rgba(0,0,0,.055));color:var(--text)}
+.zoom span{min-width:38px;text-align:center;font-size:11px;color:var(--text2)}
+
+.main{flex:1;min-height:0;display:flex}
+.side{width:212px;flex:none;display:flex;flex-direction:column;background:var(--panel);border-right:1px solid var(--line);z-index:4;transition:margin-left .34s var(--ease-apple),opacity .22s ease}
+.main.side-hidden{overflow:hidden}
+.main.side-hidden .side{margin-left:-223px;opacity:0;pointer-events:none;border-color:transparent}
+.panel-rail{display:flex;flex-direction:column;align-items:center;gap:9px;width:36px;flex:none;padding:11px 0 12px;border:1px solid var(--line);border-radius:13px;background:var(--panel);color:var(--text3);cursor:pointer;transition:opacity .2s ease,color .15s,border-color .15s,background .15s;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.panel-rail:hover{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
+.panel-rail:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.panel-rail .rail-chev{font-size:15px;line-height:1}
+.panel-rail .rail-label{writing-mode:vertical-rl;font-size:10px;letter-spacing:3px;color:inherit;opacity:.85}
+.panel-rail .rail-count{font-size:9.5px;padding:0 6px;border-radius:8px;background:var(--accent-soft);color:var(--accent)}
+.panel-rail.rail-left{margin-right:10px}
+.panel-rail.rail-right{position:absolute;right:6px;top:50%;transform:translateY(-50%);z-index:6;box-shadow:var(--shadow)}
+body.dark .panel-rail{background:rgba(18,22,31,.66);border-color:rgba(255,255,255,.14);color:var(--text3)}
+body.dark .panel-rail:hover{background:rgba(126,176,217,.14);border-color:rgba(126,176,217,.5);color:#a9c7e2}
+.edge-pan-glow{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .25s ease;z-index:2}
+.edge-pan-glow.on{opacity:1}
+.edge-pan-glow.left{background:linear-gradient(90deg,rgba(47,111,173,.14),transparent 46px)}
+.edge-pan-glow.right{background:linear-gradient(270deg,rgba(47,111,173,.14),transparent 46px)}
+.edge-pan-glow.top{background:linear-gradient(180deg,rgba(47,111,173,.14),transparent 46px)}
+.edge-pan-glow.bottom{background:linear-gradient(0deg,rgba(47,111,173,.14),transparent 46px)}
+body.dark .edge-pan-glow.left{background:linear-gradient(90deg,rgba(126,176,217,.2),transparent 46px)}
+body.dark .edge-pan-glow.right{background:linear-gradient(270deg,rgba(126,176,217,.2),transparent 46px)}
+body.dark .edge-pan-glow.top{background:linear-gradient(180deg,rgba(126,176,217,.2),transparent 46px)}
+body.dark .edge-pan-glow.bottom{background:linear-gradient(0deg,rgba(126,176,217,.2),transparent 46px)}
+.side-head{padding:11px 12px 9px;border-bottom:1px solid var(--line)}
+.side-title{font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px}
+.side-sub{font-size:10px;color:var(--text3);margin-top:2px}
+.side-search{height:28px;margin:9px 10px 6px;display:flex;align-items:center;gap:6px;padding:0 8px;border:1px solid var(--line2);border-radius:6px;background:var(--panel2)}
+.side-search input{border:0;outline:0;background:transparent;width:100%;font-size:11px;color:var(--text)}
+.side-search input::placeholder{color:var(--text3)}
+.side-list{flex:1;min-height:0;overflow-y:auto;padding:2px 8px 12px}
+.side-group{font-size:10px;color:var(--text3);padding:9px 6px 4px;letter-spacing:.3px}
+.side-item{display:flex;align-items:flex-start;gap:7px;padding:7px 7px;border-radius:6px;cursor:pointer}
+.side-item:hover{background:var(--panel2)}
+.side-item.sel{background:var(--accent-soft)}
+.side-dot{width:8px;height:8px;border-radius:3px;flex:none;margin-top:4px}
+.side-item .si-t{font-size:11px;font-weight:500;line-height:1.3}
+.side-item .si-d{font-size:9.5px;color:var(--text3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.side-foot{padding:9px 12px;border-top:1px solid var(--line);font-size:9.5px;color:var(--text3);line-height:1.55}
+
+.canvas-area{--drawer-panel-w:304px;--drawer-width:var(--drawer-panel-w);flex:1;min-width:0;position:relative;overflow:hidden;background:#f7f9fb}
+.grid{position:absolute;inset:0;background-image:radial-gradient(#d8e0e7 1px,transparent 1px);background-size:20px 20px;opacity:.75}
+.viewport{position:absolute;inset:0;overflow:hidden;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none}
+.viewport input,.viewport textarea,.viewport [contenteditable="true"]{user-select:text;-webkit-user-select:text;touch-action:auto}
+.viewport.dragging{cursor:grabbing}
+.sticky textarea{overflow-y:auto;overscroll-behavior:contain}
+.world{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
+.edges{position:absolute;left:0;top:0;width:1600px;height:1000px;pointer-events:none;overflow:visible}
+.edge-path{fill:none;stroke:rgba(120,138,160,.55);stroke-width:1.6;stroke-linecap:round;transition:stroke .2s ease}
+.edge-head{fill:rgba(120,138,160,.78);transition:fill .2s ease}
+body.dark .edge-path{stroke:rgba(165,180,200,.42)}
+body.dark .edge-head{fill:rgba(165,180,200,.65)}
+.node{position:absolute;width:240px}
+.card{background:var(--panel);border:1px solid var(--line2);border-radius:14px;padding:11px 12px 10px;box-shadow:var(--shadow);cursor:pointer;transition:transform .22s var(--spring),border-color .16s ease,box-shadow .22s var(--spring);position:relative}
+.card:hover{border-color:#a9b7c4;transform:translateY(-2px)}
+.card:active{transform:scale(.99)}
+.node.sel .card{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft),var(--shadow)}
+.card::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:3px;border-radius:0 3px 3px 0;background:var(--nc,#888)}
+.c-top{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.folder{font-size:13px;color:var(--nc,#888);line-height:1}
+.rbadge{font-size:9.5px;padding:1px 6px;border-radius:8px;color:#fff;background:var(--nc,#888)}
+.c-top .spacer{flex:1}
+.node-delete{width:23px;height:23px;display:flex;align-items:center;justify-content:center;border:0;border-radius:6px;background:transparent;color:var(--text3);padding:4px;cursor:pointer;flex:none}
+.node-delete svg{width:15px;height:15px}
+.node-delete:hover,.node-delete:focus-visible{background:rgba(220,68,62,.12);color:#dc443e}
+.node-delete:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.drawer-delete{display:flex;align-items:center;gap:7px;margin-top:18px;padding-top:12px;border-top:1px solid var(--line)}
+.drawer-delete .btn{color:#dc443e;border-color:rgba(220,68,62,.28)}
+.drawer-delete span{font-size:10px;line-height:1.5;color:var(--text3)}
+.float-tools button:disabled{opacity:.4;cursor:default}
+.toast-undo{margin-left:12px;border:0;border-radius:5px;padding:3px 7px;background:rgba(255,255,255,.15);color:#fff;font:inherit;cursor:pointer}
+.state{font-size:9.5px;padding:1px 6px;border-radius:8px;white-space:nowrap}
+.state.done{background:var(--ok-soft);color:var(--ok)}
+.state.now{background:var(--accent-soft);color:var(--accent)}
+.state.wait{background:#f0f2f4;color:var(--text3)}
+.c-title{font-size:12.5px;font-weight:600;line-height:1.3}
+.node-title-input{width:100%;font-size:12.5px;font-weight:600;border:1px solid var(--accent);border-radius:4px;padding:1px 3px;background:var(--panel-solid);color:var(--text);outline:0}
+.c-desc{font-size:10.5px;color:var(--text2);line-height:1.5;margin-top:4px;min-height:31px}
+.c-foot{display:flex;align-items:center;gap:6px;margin-top:7px;padding-top:6px;border-top:1px solid var(--line)}
+.c-cnt{font-size:10.5px;font-weight:600;color:var(--text)}
+.c-date{font-size:9.5px;color:var(--text3)}
+.c-foot .spacer{flex:1}
+.retry{font-size:9.5px;padding:1px 6px;border:1px solid var(--line2);border-radius:5px;background:#fff;color:var(--warn)}
+.c-note-btn{font-size:10.5px;padding:1px 7px;border:1px solid transparent;border-radius:999px;background:var(--panel2);color:var(--text2);opacity:0;transition:opacity .15s ease,background .14s ease,color .14s ease}
+.node:hover .c-note-btn,.node.sel .c-note-btn,.c-note-btn.on{opacity:1}
+.c-note-btn:hover,.c-note-btn.on{background:rgba(217,175,70,.16);color:#9a7215;border-color:rgba(217,175,70,.35)}
+body.dark .c-note-btn:hover,body.dark .c-note-btn.on{color:#f2d282}
+.tail{width:1px;height:10px;background:var(--line2);margin:0 auto;animation:stickyIn .2s var(--spring) both}
+.sticky{background:#fffbe9;border:1px solid #eadfb4;border-radius:11px;padding:7px 9px 8px;box-shadow:0 4px 12px rgba(120,100,40,.08);animation:stickyIn .22s var(--spring) both}
+@keyframes stickyIn{from{opacity:0;transform:translateY(-4px) scale(.98)}to{opacity:1;transform:none}}
+.sticky-h{font-size:9.5px;color:#9a7f2e;margin-bottom:4px;display:flex;align-items:center;gap:4px;cursor:zoom-in;user-select:none}
+.sticky textarea{width:100%;height:58px;resize:vertical;border:0;outline:0;background:transparent;color:#5c4f2b;font-size:10px;line-height:1.5;font-family:Consolas,Menlo,monospace}
+.sticky textarea::placeholder{color:#b7a878}
+.sticky:focus-within{border-color:#d9c47e;background:#fffdf2}
+.add-node{position:absolute;width:240px;border:1.5px dashed var(--line2);border-radius:10px;background:rgba(255,255,255,.6);height:74px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--text3);font-size:10.5px;cursor:pointer}
+.add-node:hover{border-color:var(--accent);color:var(--accent)}
+.add-node b{font-size:17px;font-weight:400;line-height:1}
+
+.hint{position:absolute;left:14px;bottom:12px;background:rgba(255,255,255,.94);border:1px solid var(--line);border-radius:7px;padding:6px 10px;font-size:10.5px;color:var(--text3);box-shadow:var(--shadow);pointer-events:none}
+.float-tools{position:absolute;left:50%;transform:translateX(-50%);bottom:12px;display:flex;gap:3px;padding:4px;background:rgba(255,255,255,.96);border:1px solid var(--line2);border-radius:9px;box-shadow:var(--shadow);z-index:3}
+.float-tools button{width:29px;height:27px;border:0;border-radius:5px;background:#fff;color:var(--text2);font-size:13px}
+.float-tools button:hover{background:var(--accent-soft);color:var(--accent)}
+.float-tools button.on{background:var(--accent);color:#fff}
+.float-tools .sep{width:1px;background:var(--line);margin:3px 2px}
+
+.drawer{position:absolute;right:0;top:0;bottom:0;width:var(--drawer-panel-w,304px);background:var(--panel);border-left:1px solid var(--line2);box-shadow:-8px 0 24px rgba(24,40,56,.07);z-index:5;display:flex;flex-direction:column;transition:transform .34s var(--ease-apple)}
+.canvas-area.drawer-hidden{--drawer-width:42px}
+.canvas-area.drawer-hidden .drawer{transform:translateX(108%)}
+.canvas-area .viewport,.canvas-area .grid{transition:right .34s var(--ease-apple)}
+.canvas-area .float-tools{transition:left .34s var(--ease-apple),max-width .34s var(--ease-apple)}
+.canvas-area .hint{transition:max-width .34s var(--ease-apple)}
+.d-head{padding:11px 12px 9px;border-bottom:1px solid var(--line)}
+.d-top{display:flex;align-items:center;gap:7px}
+.d-badge{font-size:9.5px;padding:1px 6px;border-radius:8px;color:#fff}
+.tool-chip{font-family:Consolas,Menlo,monospace;font-size:9px;padding:1px 7px;border-radius:8px;border:1px solid rgba(47,111,173,.32);background:rgba(47,111,173,.09);color:#2f6fad;white-space:nowrap;font-weight:600;letter-spacing:.3px}
+.c-top .tool-chip{margin-left:-1px}
+body.dark .tool-chip{border-color:rgba(126,176,217,.35);background:rgba(126,176,217,.14);color:#a9c7e2}
+.panel-btn{width:25px;height:25px;flex:none;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line2);border-radius:999px;background:rgba(255,255,255,.78);color:var(--text3);cursor:pointer;padding:0;transition:background .15s,color .15s,border-color .15s,transform .1s;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.panel-btn svg{width:13px;height:13px}
+.panel-btn:hover{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.panel-btn:active{transform:scale(.9)}
+.panel-btn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+body.dark .panel-btn{background:rgba(30,36,48,.72);border-color:rgba(255,255,255,.14);color:var(--text3)}
+body.dark .panel-btn:hover{background:rgba(126,176,217,.16);border-color:rgba(126,176,217,.5);color:#a9c7e2}
+.panel-btn.in-dhead{margin-left:auto}
+.side-head{position:relative}
+.side-head .panel-btn{position:absolute;right:9px;top:9px}
+.d-head{position:relative}
+.d-name{font-size:12.5px;font-weight:600;flex:1;min-width:0}
+.d-x{width:22px;height:22px;border:0;border-radius:5px;background:#fff;color:var(--text3);font-size:14px}
+.d-x:hover{background:#eef1f4;color:var(--text)}
+.d-path{font-family:Consolas,Menlo,monospace;font-size:9.5px;color:var(--text3);margin-top:6px;word-break:break-all;line-height:1.5}
+.d-body{flex:1;min-height:0;overflow-y:auto;padding:11px 12px 18px}
+.sec{font-size:10.5px;font-weight:600;color:var(--text2);margin:13px 0 7px;display:flex;align-items:center;gap:6px}
+.sec:first-child{margin-top:0}
+.sec::after{content:"";flex:1;height:1px;background:var(--line)}
+.struct{position:relative;height:132px;border:1px solid var(--line);border-radius:8px;background:linear-gradient(180deg,#fbfcfd,#f1f5f9);overflow:hidden}
+.struct svg{position:absolute;inset:0;width:100%;height:100%}
+.struct .sl{position:absolute;left:8px;top:6px;font-size:9.5px;color:var(--text3)}
+.struct .so{position:absolute;right:7px;bottom:7px}
+.struct-note{border:1px solid var(--line);border-radius:8px;background:rgba(251,252,253,.62);display:flex;align-items:center;gap:8px;padding:7px 9px}
+.struct-note .sl{flex:1;min-width:0;font-size:10px;color:var(--text3);line-height:1.55}
+.struct-note .mini{flex:none;white-space:nowrap;align-self:center}
+.d-note.is-empty{background:var(--panel2);border:1px dashed var(--line2);color:var(--text3);font-family:inherit}
+.file{display:flex;align-items:center;gap:7px;padding:6px 0;border-bottom:1px solid #eef1f4;font-size:10.5px}
+.file:last-child{border-bottom:0}
+.file .fi{width:16px;text-align:center;color:var(--text3);font-size:11px}
+.file .fn{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:Consolas,Menlo,monospace;font-size:9.5px}
+.file .fs{font-size:9.5px;color:var(--text3);white-space:nowrap}
+.kv{display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid #eef1f4;font-size:10.5px}
+.kv:last-child{border-bottom:0}
+.kv .k{color:var(--text2)}
+.kv .v{font-family:Consolas,Menlo,monospace;font-weight:600}
+.link{font-size:10.5px;color:var(--accent);background:var(--accent-soft);border:1px solid #d3e5f2;border-radius:6px;padding:6px 8px;margin-bottom:5px;cursor:pointer}
+.link:hover{background:#dcecf7}
+.d-note{font-size:10px;color:#5c4f2b;background:rgba(255,251,233,.78);border:1px solid #eadfb4;border-radius:6px;padding:7px 8px;line-height:1.6;font-family:Consolas,Menlo,monospace;white-space:pre-wrap;word-break:break-all}
+.d-cmd{font-size:10px;color:#264a63;background:rgba(242,247,251,.72);border:1px solid #d3e3ef;border-radius:6px;padding:7px 8px;line-height:1.6;font-family:Consolas,Menlo,monospace;white-space:pre-wrap;word-break:break-all;margin:0}
+.d-hint{font-size:9.5px;color:var(--text3);line-height:1.6;margin-top:4px}
+.d-hint .mono{font-family:Consolas,Menlo,monospace;color:var(--text2)}
+/* 导入弹窗 */
+.modal-mask{position:fixed;inset:0;z-index:120;background:rgba(18,30,42,.42);display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;visibility:hidden;pointer-events:auto;transition:opacity .22s ease,visibility 0s linear .28s}
+.modal-mask.open{opacity:1;visibility:visible;transition:opacity .22s ease,visibility 0s linear 0s}
+.modal{width:min(824px,100%);max-height:88vh;background:#fff;border-radius:10px;box-shadow:0 18px 60px rgba(15,28,40,.28);display:flex;flex-direction:column;overflow:hidden;opacity:0;transform:translateY(14px) scale(.965);transform-origin:50% 46%;transition:opacity .2s ease,transform .28s cubic-bezier(.22,.8,.28,1)}
+.modal-mask.open .modal{opacity:1;transform:translateY(0) scale(1)}
+@media(prefers-reduced-motion:reduce){
+  .modal-mask,.modal-mask.open,.modal{transition:none}
+  .modal,.modal-mask.open .modal{transform:none}
+}
+.m-head{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);font-size:13px}
+.m-head b{font-weight:600}
+.m-x{margin-left:auto;width:24px;height:24px;border:0;background:transparent;color:var(--text3);font-size:17px;border-radius:5px;line-height:1}
+.m-x:hover{background:var(--panel2);color:var(--text)}
+.m-tabs{display:flex;gap:2px;padding:8px 14px 0;border-bottom:1px solid var(--line)}
+.m-tab{border:1px solid transparent;border-bottom:0;background:transparent;color:var(--text2);font-size:12px;padding:6px 12px;border-radius:6px 6px 0 0;margin-bottom:-1px}
+.m-tab.active{background:#fff;border-color:var(--line);color:var(--text);font-weight:600}
+.m-pane{padding:14px;overflow:auto;flex:1;min-height:0}
+.m-hint{font-size:11px;color:var(--text2);line-height:1.65;margin-bottom:10px;background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:8px 10px}
+.m-hint b{color:var(--warn)}
+.m-row{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+.m-input{flex:1;min-width:180px;height:26px;border:1px solid var(--line2);border-radius:5px;padding:0 8px;font-size:11.5px}
+.m-file{font-size:11px;color:var(--text3);font-family:Consolas,Menlo,monospace}
+.m-area{width:100%;min-height:210px;border:1px solid var(--line2);border-radius:7px;padding:9px 10px;font-size:11px;line-height:1.6;resize:vertical;white-space:pre-wrap;word-break:break-all;overflow:auto;box-sizing:border-box}
+.m-check{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2);margin-top:9px}
+.m-msg{margin:0 14px 10px;padding:8px 10px;border-radius:7px;font-size:11px;line-height:1.6;white-space:pre-wrap;max-height:180px;overflow:auto}
+.m-msg.err{background:var(--warn-soft);border:1px solid #eccfc6;color:var(--warn)}
+.m-msg.ok{background:var(--ok-soft);border:1px solid #c9e3d5;color:var(--ok)}
+.m-msg.warn{background:#fdf6e3;border:1px solid #ecdfba;color:#8a6d1f}
+.import-progress{margin:0 14px 10px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)}
+.import-progress-head{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text2)}
+.import-progress-head strong{font-weight:600;color:var(--text)}
+.import-progress-pct{margin-left:auto;color:var(--accent);font-family:Consolas,Menlo,monospace;font-size:10px}
+.import-progress-track{height:5px;margin-top:7px;border-radius:99px;background:var(--line);overflow:hidden}
+.import-progress-bar{height:100%;width:0;border-radius:inherit;background:var(--accent);transition:width .18s ease}
+.import-progress.is-indeterminate .import-progress-bar{width:35%;animation:import-progress-slide 1.2s ease-in-out infinite}
+.import-progress-detail{margin-top:5px;color:var(--text3);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@keyframes import-progress-slide{0%{margin-left:-35%}100%{margin-left:100%}}
+.m-foot{display:flex;align-items:center;gap:8px;padding:11px 14px;border-top:1px solid var(--line);background:var(--panel2)}
+
+.statusbar{height:26px;flex:none;display:flex;align-items:center;gap:10px;padding:0 12px;background:var(--panel);border-top:1px solid var(--line);font-size:10px;color:var(--text3)}
+
+/* ============ 玻璃覆写层（与主页 StructBoard 同风格） ============ */
+body::before{
+  content:"";position:fixed;inset:-20%;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(46% 42% at 12% 6%, rgba(64,140,255,.07), transparent 62%),
+    radial-gradient(40% 38% at 88% 10%, rgba(146,104,255,.06), transparent 64%),
+    radial-gradient(44% 40% at 78% 88%, rgba(46,200,210,.06), transparent 66%),
+    radial-gradient(36% 36% at 8% 90%, rgba(255,128,100,.04), transparent 62%),
+    linear-gradient(180deg,rgba(244,247,251,.05),rgba(233,238,245,.08));
+}
+.app{position:relative;z-index:1}
+.appbar,.side,.drawer,.statusbar,.modal,.float-tools,.hint{
+  background:var(--panel);
+  backdrop-filter:var(--blur);
+  -webkit-backdrop-filter:var(--blur);
+  border-color:var(--line);
+  box-shadow:var(--shadow);
+}
+.appbar{border-bottom:none}
+.main{gap:10px;padding:10px 0 0 10px}
+.side{border:1px solid var(--line);border-radius:16px;margin-bottom:10px;overflow:hidden}
+.canvas-area{border:1px solid var(--line);border-radius:16px 0 0 0;margin-bottom:10px;overflow:hidden;background:rgba(255,255,255,.22);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.statusbar{border:1px solid var(--line);border-radius:12px;margin:0 10px 10px}
+.side-search{background:var(--panel2)}
+.side-item.sel{background:var(--accent-soft)}
+.grid{background-image:radial-gradient(rgba(16,28,48,.13) 1px,transparent 1px);opacity:.5}
+.tabbar{background:var(--panel2);border-color:var(--line)}
+.tab.active{background:var(--panel-solid);color:var(--accent);box-shadow:0 1px 5px rgba(10,25,50,.14),0 1px 0 rgba(255,255,255,.4) inset}
+.picker{background:var(--panel2);border-color:var(--line2)}
+.btn{background:var(--panel-solid);border-color:var(--line2)}
+.btn:hover{border-color:rgba(16,28,48,.3)}
+.btn.primary{background:linear-gradient(180deg,#3a8dff,#0a74ec);border-color:rgba(255,255,255,.2);box-shadow:0 4px 16px rgba(10,116,236,.35)}
+.mini{background:var(--panel-solid)}
+.zoom{background:var(--panel-solid);border-color:var(--line2)}
+.zoom button:hover{background:var(--panel2)}
+.card{background:var(--panel);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border-color:var(--line)}
+.card:hover{border-color:var(--line2)}
+.node.sel .card{box-shadow:0 0 0 2px var(--accent-soft),var(--shadow)}
+.state.wait{background:var(--panel2)}
+.retry{background:var(--panel-solid)}
+.sticky{background:rgba(255,249,225,.72);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border-color:rgba(234,223,180,.8)}
+.sticky:focus-within{background:rgba(255,253,242,.95)}
+.add-node{background:rgba(255,255,255,.45);border-color:var(--line2)}
+.hint{border-radius:9px;font-size:10.5px;pointer-events:none}
+.float-tools{left:50%;transform:translateX(-50%);gap:3px;padding:5px;border-radius:13px;box-shadow:var(--shadow)}
+.float-tools button{width:30px;height:27px;border:0;border-radius:8px;background:transparent;color:var(--text2);font-size:13px}
+.float-tools button:hover{background:var(--accent-soft);color:var(--accent)}
+.float-tools button.on{background:var(--accent);color:#fff}
+.float-tools .sep{width:1px;background:var(--line);margin:3px 2px}
+.float-tools button.wide{width:auto;padding:0 10px;font-size:11px;gap:4px;display:inline-flex;align-items:center}
+.drawer{border-left:1px solid var(--line);box-shadow:-8px 0 24px rgba(24,40,56,.08)}
+.modal-mask{background:rgba(30,42,60,.35);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px)}
+.modal{background:var(--panel);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border:1px solid var(--line2);border-radius:16px}
+.m-tab.active{background:var(--panel-solid);border-color:var(--line);color:var(--text)}
+.data-badge{font-size:10px;padding:3px 9px;border-radius:9px;background:var(--accent-soft);color:var(--accent);white-space:nowrap}
+.struct{background:linear-gradient(180deg,rgba(251,252,253,.8),rgba(241,245,249,.8))}
+.struct-note{background:var(--panel2);border-color:var(--line)}
+.link{background:var(--accent-soft);border-color:rgba(10,132,255,.25)}
+.link:hover{background:rgba(10,132,255,.2)}
+
+/* ============ 深色玻璃（跟随主界面主题） ============ */
+:root{color-scheme:light}
+:root:has(body.dark){color-scheme:dark}
+body.dark{
+  --panel:rgba(40,41,46,.6);--panel-solid:rgba(44,45,50,.94);--panel2:rgba(120,120,128,.24);
+  --line:rgba(255,255,255,.085);--line2:rgba(255,255,255,.17);
+  --text:#f5f5f7;--text2:rgba(235,235,245,.66);--text3:rgba(235,235,245,.34);
+  --accent-soft:rgba(10,132,255,.2);--ok-soft:rgba(48,209,88,.14);--warn-soft:rgba(255,159,10,.12);
+  --shadow:0 1px 1px rgba(0,0,0,.25);
+}
+body.dark::before{
+  background:
+    radial-gradient(46% 42% at 12% 6%, rgba(41,121,255,.07), transparent 62%),
+    radial-gradient(40% 38% at 88% 10%, rgba(120,84,255,.06), transparent 64%),
+    radial-gradient(44% 40% at 78% 88%, rgba(24,190,200,.05), transparent 66%),
+    radial-gradient(36% 36% at 8% 90%, rgba(255,108,84,.035), transparent 62%),
+    linear-gradient(180deg,rgba(11,14,21,.08),rgba(9,12,17,.12));
+}
+body.dark .tabbar{background:rgba(255,255,255,.06);border-color:var(--line)}
+body.dark .tab.active{background:var(--panel-solid);box-shadow:0 1px 5px rgba(0,0,0,.35)}
+body.dark .picker,body.dark .btn,body.dark .mini,body.dark .zoom,
+body.dark .zoom button,body.dark .retry,body.dark .d-x,
+body.dark .float-tools button,body.dark .m-tab.active{background:var(--panel-solid);color:var(--text)}
+body.dark .picker:disabled,body.dark .zoom button:hover,body.dark .d-x:hover{background:rgba(255,255,255,.1)}
+body.dark .state.wait{background:rgba(255,255,255,.07)}
+body.dark .grid{background-image:radial-gradient(rgba(255,255,255,.13) 1px,transparent 1px)}
+body.dark .canvas-area{background:rgba(8,11,18,.26)}
+body.dark .card{background:rgba(22,26,36,.52)}
+body.dark .c-foot,body.dark .sec{border-color:var(--line)}
+body.dark .sticky{background:rgba(58,50,26,.62);border-color:rgba(212,183,94,.35);color:#f0e2b0}
+body.dark .sticky textarea{color:#f0e2b0}
+body.dark .sticky textarea::placeholder{color:#9b8d64}
+body.dark .sticky-h{color:#c9b878}
+body.dark .sticky:focus-within{background:rgba(66,57,30,.78)}
+body.dark .add-node{background:rgba(255,255,255,.04);border-color:var(--line2)}
+body.dark .hint,body.dark .float-tools{background:rgba(22,26,36,.72);border-color:var(--line)}
+body.dark .drawer{background:rgba(18,22,31,.62)}
+body.dark .file,body.dark .kv,body.dark .d-head,body.dark .m-head,body.dark .m-foot,
+body.dark .m-tabs,body.dark .statusbar{border-color:var(--line)}
+body.dark .struct{background:linear-gradient(180deg,rgba(251,252,253,.06),rgba(241,245,249,.03))}
+body.dark .struct-note{background:rgba(255,255,255,.045)}
+body.dark .d-note{background:rgba(58,50,26,.5);border-color:rgba(212,183,94,.3);color:#f0e2b0}
+body.dark .d-note.is-empty{background:var(--panel2);border-color:var(--line2);color:var(--text3)}
+body.dark .d-cmd{background:rgba(20,38,54,.6);border-color:rgba(70,120,160,.32);color:#a8d4f0}
+body.dark .link{background:var(--accent-soft);border-color:rgba(10,132,255,.3)}
+body.dark .link:hover{background:rgba(10,132,255,.26)}
+body.dark .modal{background:rgba(24,28,38,.92);border:1px solid var(--line2)}
+body.dark .m-hint,body.dark .m-area,body.dark .m-input{background:rgba(255,255,255,.05);border-color:var(--line)}
+body.dark .m-msg.err{background:rgba(255,69,58,.12);border-color:rgba(255,69,58,.3);color:#ff8a80}
+body.dark .m-msg.ok{background:rgba(48,209,88,.12);border-color:rgba(48,209,88,.3);color:#7ee49b}
+body.dark .m-msg.warn{background:rgba(255,159,10,.12);border-color:rgba(255,159,10,.3);color:#ffc46b}
+body.dark .zoom span{color:var(--text2)}
+
+/* ============ 强化版整体玻璃工作台 ============ */
+body{isolation:isolate}
+.app{
+  position:relative;z-index:1;
+  width:calc(100% - 16px);height:calc(100% - 16px);margin:8px;
+  border:1px solid rgba(255,255,255,.58);border-radius:18px;overflow:hidden;
+  background:rgba(246,249,254,.025);
+  backdrop-filter:none;-webkit-backdrop-filter:none;
+  box-shadow:0 8px 26px rgba(28,44,70,.065),0 1px 0 rgba(255,255,255,.72) inset;
+}
+.appbar,.side,.drawer,.statusbar{
+  background:rgba(255,255,255,.28);
+  backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);
+}
+.appbar{border-bottom:1px solid rgba(255,255,255,.5);padding-right:138px}
+.appbar .data-badge{min-width:0;overflow:hidden;text-overflow:ellipsis}
+body.pipeline-fullscreen .app{width:100%;height:100%;margin:0;border:0;border-radius:0}
+body.pipeline-fullscreen .appbar{padding-right:138px}
+.agent-guide{padding:12px;margin-bottom:12px;border:1px solid var(--line2);border-radius:11px;background:var(--accent-soft)}
+.agent-guide-top{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.agent-guide-top b{font-size:12px;color:var(--text)}
+.agent-guide p{font-size:11px;line-height:1.65;color:var(--text2);margin:5px 0 0}
+.agent-guide .btn{flex:none}
+.agent-copy-status{font-size:11px;color:var(--accent);line-height:1.5}
+.agent-copy-status:not(:empty){margin-top:7px}
+.agent-example{margin-top:9px;font-size:11px;color:var(--text2)}
+.agent-example summary{cursor:pointer;color:var(--accent);width:fit-content}
+.agent-example .m-area{margin-top:8px;height:190px;min-height:140px;background:var(--panel-solid);color:var(--text)}
+/* 节点详情固定占据右栏，画布交互区不再伸入侧栏。 */
+.canvas-area .viewport,.canvas-area .grid{right:var(--drawer-width)}
+.canvas-area .float-tools{left:calc((100% - var(--drawer-width))/2);max-width:calc(100% - var(--drawer-width) - 20px);flex-wrap:wrap;justify-content:center}
+.canvas-area .hint{max-width:calc(100% - var(--drawer-width) - 28px)}
+.drawer-empty{padding:16px 2px;color:var(--text3);font-size:12px;line-height:1.8}
+@media(max-width:1100px){.canvas-area{--drawer-panel-w:280px}.canvas-area .hint{display:none}}
+.side{border-right:1px solid rgba(255,255,255,.46)}
+.canvas-area{background:rgba(255,255,255,.01);backdrop-filter:none;-webkit-backdrop-filter:none}
+.grid{opacity:.23}
+.card{background:rgba(249,251,255,.94);backdrop-filter:none;-webkit-backdrop-filter:none;border-color:rgba(194,204,218,.72);box-shadow:0 3px 10px rgba(40,60,90,.075),0 1px 0 rgba(255,255,255,.72) inset}
+.sticky{background:rgba(255,251,233,.96);backdrop-filter:none;-webkit-backdrop-filter:none;border-color:rgba(234,223,180,.92);box-shadow:0 2px 8px rgba(120,100,40,.07),0 1px 0 rgba(255,255,255,.72) inset}
+.float-tools,.hint{background:rgba(255,255,255,.46);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-color:rgba(255,255,255,.58)}
+body.dark .app{background:rgba(16,20,29,.035);border-color:rgba(255,255,255,.18);box-shadow:0 8px 26px rgba(0,0,0,.18),0 1px 0 rgba(255,255,255,.1) inset}
+body.dark .appbar,body.dark .side,body.dark .drawer,body.dark .statusbar{background:rgba(18,22,31,.4);border-color:rgba(255,255,255,.12)}
+body.dark .canvas-area{background:rgba(8,11,18,.015)}
+body.dark .card{background:rgba(28,32,43,.97);backdrop-filter:none;-webkit-backdrop-filter:none;border-color:rgba(255,255,255,.17);box-shadow:0 3px 10px rgba(0,0,0,.22),0 1px 0 rgba(255,255,255,.07) inset}
+body.dark .sticky{background:rgba(53,47,31,.97);backdrop-filter:none;-webkit-backdrop-filter:none;border-color:rgba(212,183,94,.42);box-shadow:0 2px 8px rgba(0,0,0,.18),0 1px 0 rgba(255,255,255,.06) inset}
+body.dark .float-tools,body.dark .hint{background:rgba(18,22,31,.56);border-color:rgba(255,255,255,.14)}
+/* Spatial materials: one translucent shell, readable controls and solid node surfaces. */
+.app{background:rgba(246,248,250,.18);border-color:rgba(255,255,255,.48);box-shadow:0 12px 32px rgba(25,34,44,.08),0 1px 0 rgba(255,255,255,.7) inset}
+.appbar,.side,.drawer,.statusbar{background:rgba(249,250,251,.53);backdrop-filter:none;-webkit-backdrop-filter:none}
+.appbar{border-bottom-color:rgba(255,255,255,.22);box-shadow:0 8px 20px rgba(30,40,50,.035)}
+.side,.drawer{border-color:rgba(255,255,255,.42);box-shadow:0 8px 24px rgba(30,40,50,.07),0 1px 0 rgba(255,255,255,.55) inset}
+.canvas-area{border-color:rgba(255,255,255,.24);background:rgba(245,248,250,.12)}
+.float-tools,.hint{background:rgba(250,251,252,.78);backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:0 8px 24px rgba(25,35,45,.12),0 1px 0 rgba(255,255,255,.65) inset}
+body.dark .app{background:rgba(26,28,32,.22);border-color:rgba(255,255,255,.13)}
+body.dark .appbar,body.dark .side,body.dark .drawer,body.dark .statusbar{background:rgba(35,37,42,.72);border-color:rgba(255,255,255,.1)}
+body.dark .canvas-area{background:rgba(29,31,35,.18);border-color:rgba(255,255,255,.08)}
+body.dark .float-tools,body.dark .hint{background:rgba(42,44,49,.88)}
+/* 双击便签后的大尺寸编辑对话框 */
+.note-editor-mask{position:fixed;inset:0;z-index:140;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(22,32,46,.38);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);opacity:0;visibility:hidden;transition:opacity .18s ease,visibility 0s linear .22s}
+.note-editor-mask.open{opacity:1;visibility:visible;transition:opacity .18s ease,visibility 0s linear 0s}
+.note-editor-dialog{width:min(920px,100%);height:min(78vh,760px);min-height:360px;display:flex;flex-direction:column;overflow:hidden;border:1px solid rgba(212,183,94,.38);border-radius:16px;background:rgba(255,252,237,.96);box-shadow:0 24px 80px rgba(25,35,52,.3);opacity:0;transform:translateY(10px) scale(.985);transition:opacity .18s ease,transform .2s cubic-bezier(.22,.8,.28,1)}
+.note-editor-mask.open .note-editor-dialog{opacity:1;transform:translateY(0) scale(1)}
+.note-editor-head{display:flex;align-items:center;gap:12px;min-height:58px;padding:12px 16px;border-bottom:1px solid rgba(174,148,73,.22)}
+.note-editor-mark{width:30px;height:30px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:9px;background:rgba(210,174,76,.16);color:#9a7f2e;font-size:16px}
+.note-editor-heading{min-width:0;flex:1}
+.note-editor-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#40371f;font-size:13px;font-weight:650}
+.note-editor-subtitle{margin-top:2px;color:#8b7a4b;font-size:10px}
+.note-editor-x{width:28px;height:28px;flex:none;border:0;border-radius:7px;background:transparent;color:#88794f;font-size:19px;line-height:1}
+.note-editor-x:hover{background:rgba(120,100,40,.1);color:#40371f}
+.note-editor-area{width:100%;flex:1;min-height:0;resize:none;border:0;outline:0;padding:20px 22px;background:transparent;color:#493f26;font:12.5px/1.75 Consolas,"SF Mono",Menlo,monospace;white-space:pre-wrap;overflow:auto;tab-size:2}
+.note-editor-area::placeholder{color:#b7a878}
+.note-editor-foot{min-height:54px;display:flex;align-items:center;gap:10px;padding:9px 16px;border-top:1px solid rgba(174,148,73,.22);background:rgba(255,255,255,.34)}
+.note-editor-status{font-size:10.5px;color:#89794d}
+.note-editor-foot .btn{min-width:84px}
+body.dark .note-editor-mask{background:rgba(4,7,13,.62)}
+body.dark .note-editor-dialog{background:rgba(35,33,25,.97);border-color:rgba(212,183,94,.32);box-shadow:0 24px 80px rgba(0,0,0,.55)}
+body.dark .note-editor-head,body.dark .note-editor-foot{border-color:rgba(212,183,94,.18)}
+body.dark .note-editor-foot{background:rgba(255,255,255,.025)}
+body.dark .note-editor-title,body.dark .note-editor-area{color:#f0e2b0}
+body.dark .note-editor-subtitle,body.dark .note-editor-status{color:#b7a878}
+body.dark .note-editor-mark{background:rgba(212,183,94,.14);color:#e2cc83}
+body.dark .note-editor-x{color:#c9b878}
+body.dark .note-editor-x:hover{background:rgba(255,255,255,.08);color:#f0e2b0}
+@media(max-width:640px){
+  .note-editor-mask{padding:12px}
+  .note-editor-dialog{width:100%;height:min(84vh,760px);min-height:300px;border-radius:12px}
+  .note-editor-head{min-height:52px;padding:9px 11px}
+  .note-editor-area{padding:15px;font-size:12px}
+  .note-editor-foot{min-height:50px;padding:8px 11px}
+}
+@media(prefers-reduced-motion:reduce){.note-editor-mask,.note-editor-mask.open,.note-editor-dialog,.note-editor-mask.open .note-editor-dialog{transition:none}.note-editor-dialog,.note-editor-mask.open .note-editor-dialog{transform:none}}
+</style>
+<link rel="stylesheet" href="route-map.css?v=20261120-route-map" />
+</head>
+<body>
+<div class="app">
+  <header class="appbar">
+    <div class="brand"><span class="brand-mark"><img src="app_icon_64.png" style="width:20px;height:20px;border-radius:5px;display:block;" alt="StructBoard" /></span><div class="brand-t"><b>路线地图</b><small>DESIGN MAP</small></div></div>
+    <div class="tabbar"><button class="tab" id="tabApi">项目路线</button><button class="tab active" id="tabReal">当前导入</button><button class="tab" id="tabDemo">演示</button></div>
+    <select class="picker" id="pipeSelect" title="选择设计管线"></select>
+    <button class="btn" id="btnImport" title="导入管线定义 JSON，或从数据目录生成草稿">＋ 导入</button>
+    <span class="data-badge" id="dataBadge">Aurora 人工合成演示</span>
+  </header>
+
+  <div class="main">
+    <aside class="side" data-layer="side">
+      <div class="side-head">
+        <div class="side-title">步骤目录 <span class="mono" id="sideCount" style="color:var(--text3);font-weight:400">0</span></div>
+        <div class="side-sub">搜索步骤 · 点击定位到路线</div>
+        <button class="panel-btn" id="btnSideCollapse" type="button" title="收起步骤目录（Ctrl+B）" aria-label="收起步骤目录面板"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2.4" y="3.2" width="15.2" height="13.6" rx="2.2" stroke="currentColor" stroke-width="1.6"/><path d="M8 3.2v13.6" stroke="currentColor" stroke-width="1.6"/></svg></button>
+      </div>
+      <div class="side-search"><span style="color:var(--text3)">⌕</span><input id="sideSearch" placeholder="搜索节点" /></div>
+      <div class="side-list" id="sideList"></div>
+      <div class="side-foot" id="sideFoot">人工合成演示<br />结构和数值仅用于学习操作<br />不代表科研结果</div>
+    </aside>
+    <button class="panel-rail rail-left" id="railSide" type="button" hidden title="展开步骤目录（Ctrl+B）" aria-label="展开步骤目录面板">
+      <span class="rail-chev">›</span><span class="rail-label">步骤目录</span><span class="rail-count mono" id="railCount">0</span>
+    </button>
+
+    <section class="canvas-area" data-layer="canvas">
+      <div class="grid"></div>
+      <div class="route-heading"><div class="route-eyebrow">DESIGN ROUTE</div><h1 id="routeTitle">设计路线</h1><div class="route-counts" id="routeCounts"></div></div>
+      <div class="edge-tools" id="edgeTools" hidden><span id="edgeSelectionLabel">已选连线</span><button id="btnEdgeReset" type="button">恢复线形</button><button id="btnEdgeRemove" type="button" class="danger">删除连线</button></div>
+      <div class="route-minimap-wrap"><span>全图导航</span><svg id="routeMinimap" aria-label="路线缩略图，点击定位"></svg></div>
+      <div class="viewport" id="viewport">
+        <div class="world" id="world">
+          <svg class="edges" id="edges"></svg>
+          <div id="nodes"></div>
+          <div class="add-node" id="addNode" style="left:40px;top:320px"><b>＋</b><span>添加文件夹节点</span></div>
+        </div>
+      </div>
+      <div class="hint">拖节点调整位置 · 圆点连接步骤 · 选线拖动弯折 / 端点 · 空白拖动平移 · Ctrl+滚轮缩放</div>
+      <div class="float-tools" id="floatTools">
+        <button class="wide primary-map" id="btnNew" title="添加一个步骤节点">＋ 步骤</button><button class="wide" id="btnArrange" title="按连线自动整理，可撤销">自动整理</button>
+        <button class="wide" id="btnNote" title="添加一张可编辑的便签">✎ 便签</button>
+        <button class="wide" id="btnUndoDelete" title="撤销上一次调整（Ctrl+Z）" disabled>↶ 撤销</button>
+        <div class="sep"></div>
+        <button id="zoomOut" title="缩小">−</button><span id="zoomLabel">85%</span><button id="zoomIn" title="放大">＋</button>
+        <div class="sep"></div>
+        <button class="wide" id="btnFit" title="缩放到能看全部节点">⤢ 全图</button>
+      </div>
+
+      <aside class="drawer" id="drawer" data-layer="drawer">
+        <div class="d-head">
+          <div class="d-top"><span class="d-badge" id="dBadge">R1</span><span class="tool-chip" id="dTool" hidden></span><span class="d-name" id="dName">折叠检验</span>
+            <button class="panel-btn in-dhead" id="btnDrawerCollapse" type="button" title="收起节点详情" aria-label="收起节点详情面板"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2.4" y="3.2" width="15.2" height="13.6" rx="2.2" stroke="currentColor" stroke-width="1.6"/><path d="M12 3.2v13.6" stroke="currentColor" stroke-width="1.6"/></svg></button>
+          </div>
+          <div class="d-path" id="dPath"></div>
+        </div>
+        <div class="d-body" id="dBody"></div>
+      </aside>
+      <button class="panel-rail rail-right" id="railDrawer" type="button" hidden title="展开节点详情" aria-label="展开节点详情面板">
+        <span class="rail-chev">‹</span><span class="rail-label">节点详情</span>
+      </button>
+    </section>
+  </div>
+
+  <footer class="statusbar"><span id="statusL">0 个步骤 · 0 条连线</span><div class="spacer"></div><span id="statusR">人工合成演示 · 结构和数值仅供学习，不代表科研结果</span></footer>
+</div>
+
+<!-- 导入管线定义弹窗 -->
+<div class="modal-mask" id="importMask" hidden>
+  <div class="modal" role="dialog" aria-label="导入管线定义">
+    <div class="m-head"><b>导入管线定义</b><button class="m-x" id="importClose">×</button></div>
+    <div class="m-tabs">
+      <button class="m-tab active" id="mTabJson">粘贴 JSON</button>
+      <button class="m-tab" id="mTabDir">从目录生成草稿</button>
+    </div>
+
+    <div class="m-pane" id="mPaneJson">
+      <div class="agent-guide">
+        <div class="agent-guide-top"><div><b>让 Agent 整理成管线</b><p>复制格式给 Agent → 生成 JSON → 粘贴到下方导入 → 点节点打开结构。</p></div><button class="btn" id="btnCopyAgent" type="button">复制给 Agent</button></div>
+        <div class="agent-copy-status" id="agentCopyStatus" role="status" aria-live="polite"></div>
+        <details class="agent-example"><summary>查看 JSON 示例与字段说明</summary>
+          <p><code>root</code> 写本机数据根目录；<code>files / globs / dir</code> 都相对它填写。步骤按 <code>steps</code> 顺序排列。</p>
+          <textarea id="agentExample" class="m-area mono" readonly spellcheck="false" aria-label="管线 JSON 格式示例"></textarea>
+          <p>结构支持 PDB、mmCIF、BinaryCIF 及 gzip。JSON 记录路径与说明，结构文件需保留在本机可访问的位置。</p>
+        </details>
+      </div>
+      <div class="m-hint">粘贴 Agent 生成的 JSON，或选择 <span class="mono">.json</span> 文件（最大 128 MB）。大文件会在后台读取，进度条显示各阶段实际进度。导入后，在节点内点「在结构视图中打开」即可加载。</div>
+      <div class="m-row">
+        <button class="btn" id="btnPickFile">选择 JSON 文件…</button>
+        <span class="m-file" id="pickFileName">未选择文件</span>
+      </div>
+      <div class="m-msg" id="importMsg" hidden></div>
+      <textarea id="mJson" class="m-area mono" spellcheck="false"
+        placeholder='{ "id": "my_pipe", "name": "我的管线", "root": "D:/datasets/my-project", "steps": [ { "id": "s0", "title": "第一步", "cmd": "TODO: ..." } ] }'></textarea>
+      <label class="m-check"><input type="checkbox" id="mOverwrite" /> 覆盖同名管线（已存在时才会写入）</label>
+    </div>
+
+    <div class="m-pane" id="mPaneDir" hidden>
+      <div class="m-hint">只扫描目录名和文件名，<b>不读文件内容、不推断阈值</b>。
+        生成的分组是<b>推测</b>，必须自己对照脚本补齐命令与条件。</div>
+      <div class="m-row">
+        <input id="mRoot" class="m-input mono" placeholder="数据目录绝对路径，例如 D:\datasets\my-project" />
+        <button class="btn" id="btnScaffold">生成草稿</button>
+      </div>
+      <div class="m-row">
+        <input id="mPid" class="m-input mono" placeholder="管线 id（留空则取目录名）" />
+        <input id="mName" class="m-input" placeholder="管线名称（可留空）" />
+      </div>
+    </div>
+
+    <div class="import-progress" id="importProgress" hidden aria-live="polite">
+      <div class="import-progress-head"><strong id="importProgressTitle">准备导入</strong><span class="import-progress-pct" id="importProgressPct">0%</span></div>
+      <div class="import-progress-track"><div class="import-progress-bar" id="importProgressBar"></div></div>
+      <div class="import-progress-detail" id="importProgressDetail"></div>
+    </div>
+    <div class="m-msg" id="importMsg2" hidden></div>
+    <div class="m-foot">
+      <button class="btn" id="btnCancel">取消</button>
+      <div class="spacer"></div>
+      <button class="btn primary" id="btnDoImport">导入并打开</button>
+    </div>
+  </div>
+</div>
+
+<!-- 便签放大编辑弹窗 -->
+<div class="note-editor-mask" id="noteEditorMask" hidden aria-hidden="true">
+  <section class="note-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="noteEditorTitle">
+    <header class="note-editor-head">
+      <span class="note-editor-mark" aria-hidden="true">▤</span>
+      <div class="note-editor-heading">
+        <div class="note-editor-title" id="noteEditorTitle">便签</div>
+        <div class="note-editor-subtitle">双击便签打开 · 修改会自动同步保存</div>
+      </div>
+      <button class="note-editor-x" id="noteEditorClose" type="button" aria-label="关闭便签编辑器" title="关闭">×</button>
+    </header>
+    <textarea class="note-editor-area" id="noteEditorArea" spellcheck="false" aria-label="便签内容" placeholder="写筛选条件、运行命令、备注…"></textarea>
+    <footer class="note-editor-foot">
+      <span class="note-editor-status" id="noteEditorStatus" role="status" aria-live="polite"></span>
+      <div class="spacer"></div>
+      <button class="btn primary" id="noteEditorDone" type="button">完成</button>
+    </footer>
+  </section>
+</div>
+
+<script src="ui/shell.js"></script>
+<script src="desktop_bridge.js"></script>
+<script src="lineage.js"></script>
+<script src="notes_sync.js?v=20261115n"></script>
+<script src="notes_edit.js?v=20261115n"></script>
+<script src="canvas_document.js"></script>
+<script src="canvas_bridge.js"></script>
+<script>/* @canvas-runtime */ window.SB_UI.startPipeline();</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "identifier": "main-window",
+  "description": "Local StructBoard desktop window",
+  "windows": [
+    "main", "pipeline-*"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:allow-close",
+    "core:window:allow-start-dragging",
+    "core:window:allow-start-resize-dragging",
+    "core:window:allow-is-maximized",
+    "core:window:allow-set-resizable"
+  ]
+}

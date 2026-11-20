@@ -1,0 +1,3 @@
+# The official SDK owns JSON-RPC, initialization, protocol negotiation, capabilities,
+# stdio framing and resource/prompt handling. Tested/pinned baseline; no faux protocol.
+mcp==1.26.0

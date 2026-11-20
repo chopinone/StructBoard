@@ -1,0 +1,130 @@
+{
+  "overviewCard": {
+    "component": "OverviewCard.vue",
+    "tag": "article",
+    "className": "overview-card",
+    "selectors": {
+      "tab": ".folder-tab",
+      "head": ".cell-head",
+      "dot": ".cell-dot",
+      "name": ".cell-name",
+      "meta": ".cell-meta",
+      "actions": ".cell-actions",
+      "starBtn": ".star",
+      "star": ".st",
+      "starBadge": ".star-badge",
+      "noteDot": ".note-dot",
+      "open": ".overview-open",
+      "open3d": ".cell-open-3d",
+      "retryBtn": ".overview-retry",
+      "image": "img",
+      "placeholder": ".overview-placeholder",
+      "note": ".folder-note",
+      "pos": ".overview-pos",
+      "count": ".overview-count",
+      "audit": ".folder-audit",
+      "pose": ".entry-pose"
+    }
+  },
+  "overviewSection": {
+    "component": "OverviewSection.vue",
+    "tag": "div",
+    "className": "overview-section",
+    "selectors": {}
+  },
+  "gridCell": {
+    "component": "GridCell.vue",
+    "tag": "div",
+    "className": "cell",
+    "selectors": {
+      "folderTab": ".folder-tab",
+      "head": ".cell-head",
+      "dot": ".cell-dot",
+      "nameEl": ".cell-name",
+      "metaEl": ".cell-meta",
+      "masterTag": ".master",
+      "actions": ".cell-actions",
+      "starBtn": ".cell-star",
+      "moreBtn": ".cell-settings",
+      "colorInput": ".sr-color",
+      "starBadge": ".star-badge",
+      "body": ".cell-body",
+      "container": ".cell-viewer",
+      "folderOpen": ".grid-folder-open",
+      "folderLabel": ".grid-folder-label",
+      "folderNote": ".folder-note",
+      "position": ".grid-position",
+      "audit": ".grid-audit",
+      "message": ".grid-load-message"
+    }
+  },
+  "harnessPanel": {
+    "component": "HarnessPanel.vue",
+    "tag": "section",
+    "className": "harness-panel",
+    "attributes": {
+      "id": "harnessPanel",
+      "hidden": "",
+      "role": "dialog",
+      "aria-modal": "false",
+      "aria-labelledby": "harnessPanelTitle"
+    },
+    "selectors": {
+      "title": "#harnessPanelTitle",
+      "closeButton": "#btnHarnessClose",
+      "desktopStatus": "#harnessDesktopStatus",
+      "refreshButton": "#btnHarnessRefresh",
+      "stopButton": "#btnHarnessStop",
+      "errorBox": "#harnessError",
+      "remember": "#harnessRemember",
+      "pairButton": "#btnHarnessPair",
+      "pairBox": "#harnessPairing",
+      "pairCode": "#harnessPairingCode",
+      "pairExpiry": "#harnessPairingExpiry",
+      "copyConfigButton": "#btnHarnessCopyConfig",
+      "copyButton": "#btnHarnessCopy",
+      "pairMessage": "#harnessPairingMessage",
+      "sessionsList": "#harnessSessions",
+      "sessionsEmpty": "#harnessSessionsEmpty",
+      "runningList": "#harnessRunning",
+      "requestList": "#harnessApprovals",
+      "requestsEmpty": "#harnessRequestsEmpty",
+      "clientsSection": "#harnessClientSetup",
+      "clientsList": ".harness-client-list",
+      "clientMessage": "#harnessClientMessage"
+    }
+  },
+  "assistantPanel": {
+    "component": "AssistantPanel.vue",
+    "tag": "div",
+    "className": "",
+    "attributes": {
+      "id": "aiChatRoot"
+    },
+    "selectors": {
+      "bubble": ".ai-bubble",
+      "bubbleLogo": ".ai-bubble-logo",
+      "statusDot": ".ai-status-dot",
+      "panel": ".ai-panel",
+      "head": ".ai-panel-head",
+      "headGrip": ".ai-head-grip",
+      "btnExport": "#aiExport",
+      "btnClear": "#aiClear",
+      "btnSettings": "#aiSettings",
+      "btnClose": "#aiClose",
+      "msgs": ".ai-msgs",
+      "chips": ".ai-chips",
+      "composer": ".ai-composer",
+      "input": ".ai-input",
+      "sendBtn": ".ai-send",
+      "stopBtn": "#aiStop",
+      "foot": ".ai-foot"
+    }
+  },
+  "assistantSettings": {
+    "component": "AssistantSettings.vue",
+    "tag": "form",
+    "className": "ai-settings ai-glass",
+    "selectors": {}
+  }
+}
