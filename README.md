@@ -1,14 +1,14 @@
 # 构境 · StructBoard
 
-**让蛋白设计，看清下一步。**
+**看清每个候选，留下判断依据。**
 
-面向 AI 蛋白设计与药物研发的本地结构工作台。把生成、预测、筛选和复核串成路线图，在同一个窗口里查看候选、比较模型、记录判断，并通过 MCP 连接 AI 客户端。
+面向 AI 蛋白设计与药物研发的本地结构工作台。把已有结构、设计步骤与复核记录放在同一工作区；浏览路线、比较模型，记录取舍。
 
-[下载 Windows 安装版](https://github.com/chopinone/StructBoard/releases/latest) · [观看 30 秒演示](https://chopinone.github.io/StructBoard/) · [从源码构建](#从源码构建)
+[下载 Windows 安装版](https://github.com/chopinone/StructBoard/releases/latest) · [观看 34 秒演示](https://chopinone.github.io/StructBoard/) · [从源码构建](#从源码构建)
 
 [![白色界面动态预览：结构联动与候选排列，点击观看完整视频](docs/images/demo-preview.gif)](https://chopinone.github.io/StructBoard/)
 
-*上方为无声片段；点击进入介绍页，直接播放带中文配音的 30 秒完整视频。画面使用虚构的 NOVA 管线与公开示例结构，不包含个人研究数据。*
+*上方为无声片段；点击进入介绍页，直接播放带中文配音的 34 秒完整视频。画面使用虚构的 NOVA 管线与公开示例结构，不包含个人研究数据。*
 
 ## 一眼看懂设计路线
 
@@ -28,11 +28,13 @@
 
 ![完整分屏界面：左侧总览，右侧结构检阅](docs/images/split-view.png)
 
-## AI 接入当前工作区
+## 两种独立的 AI 入口
 
-通过 MCP 让已授权客户端读取步骤、指标和管线。顶部连接灯显示连接名称与状态；内置助手自动推进只读查询，过程默认折叠，优先给出简短结论。修改数据仍需确认。
+**外部客户端 · MCP**：在 Codex、WorkBuddy、Claude Code、ZCode 或 Antigravity 中连接构境，按授权读取工作区、打开视图或编辑内容。模型服务在客户端侧配置。多数操作按授权执行；修改管线定义、指定路线删除及撤销操作需在构境确认。
 
-![演示助手已连接，顶部显示连接状态](docs/images/ai-connection.png)
+**内置 AI 助手**：直接在构境内提问，单独配置 OpenAI 兼容或 Anthropic 模型接口。助手连续执行只读查询，过程默认折叠；改变数据或视图前由你确认。
+
+本地读取与渲染不依赖 AI。启用 AI 后，所发送的对话、上下文和工具结果由配置的服务或客户端处理。
 
 图片和视频的素材说明见 [演示素材说明](docs/MEDIA.md)。
 

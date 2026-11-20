@@ -39,7 +39,9 @@
     "desktop_bridge.js",
     "docs/.nojekyll",
     "docs/MEDIA.md",
+    "docs/blog-structboard.html",
     "docs/images/ai-connection.png",
+    "docs/images/brand-mark.svg",
     "docs/images/demo-preview.gif",
     "docs/images/model-comparison.png",
     "docs/images/route-map.png",
@@ -221,6 +223,7 @@
     "docs/images/model-comparison.png": "3808fa89bab90bf08936102698ef60a61ef8ae9d11441ea5a02129e18b1f59c0",
     "docs/images/route-map.png": "295a6af277bc437f2bdeace5695d30e86301f5d50ea444294cd10863424783ae",
     "docs/images/split-view.png": "b3c340345a8c26eb8cf520dbd1898d4e861299d2d121449fadc8094e2da34110",
-    "docs/media/structboard-demo.mp4": "00f75b804f1f18f4e2a75f7c3855058ce77fe81d66f904afdf70852a55e445a2"
+    "docs/media/structboard-demo.mp4": "7018cb3834f3f3c27c8c48ad8e7a206574825d0f63b035c95b59f4a851e9087b",
+    "docs/images/brand-mark.svg": "0deea0fa3577011e33faf32b8a548d2513bc512c89a4fa6cbebd279e102501be"
   }
 }
