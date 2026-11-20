@@ -18,6 +18,7 @@ import zipfile
 
 SRC = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SRC))
+sys.path.insert(0, str(SRC / 'tools'))
 import build_desktop
 import resource_contract as resources
 

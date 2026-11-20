@@ -76,6 +76,14 @@ CONTRACT = {
     # not a dependency graph. Literal loaders are checked as well as this known edge.
     "dynamic_references": {"ai_chat.js": ["ai_logo.png"]},
     "approved_new_support": [
+        "CHANGELOG.md",
+        "docs/MEDIA.md",
+        "docs/images/ai-connection.png",
+        "docs/images/demo-preview.gif",
+        "docs/images/model-comparison.png",
+        "docs/images/route-map.png",
+        "docs/images/split-view.png",
+
         ".gitattributes",
         "LICENSE",
         "THIRD_PARTY_NOTICES.md",

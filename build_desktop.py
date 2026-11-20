@@ -437,7 +437,7 @@ def _cargo_environment():
         env["RUSTUP_HOME"] = str(RUST / "rustup")
     target = Path(os.environ.get("STRUCTBOARD_CARGO_TARGET_DIR", SRC / 'desktop/target'))
     env["CARGO_TARGET_DIR"] = str(target)
-    env["CARGO_BUILD_JOBS"] = "2"
+    env["CARGO_BUILD_JOBS"] = os.environ.get("CARGO_BUILD_JOBS", "1")
     cargo_bin = Path(os.environ.get("STRUCTBOARD_CARGO_BIN") or shutil.which('cargo') or
                      (RUST / ('cargo/bin/cargo.exe' if os.environ.get('STRUCTBOARD_RUST_DIR') else 'bin/cargo.exe')))
     env["PATH"] = str(cargo_bin.parent) + os.pathsep + env.get("PATH", "")

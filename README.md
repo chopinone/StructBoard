@@ -1,12 +1,46 @@
 # 构境 · StructBoard
 
-在本机整理和检阅三维结构、筛选管线、模型分数与便签。支持多个管线标签、并排检阅和通过 MCP 连接 AI 客户端。
+**让蛋白设计，看清下一步。**
+
+面向 AI 蛋白设计与药物研发的本地结构工作台。把生成、预测、筛选和复核串成路线图，在同一个窗口里查看候选、比较模型、记录判断，并通过 MCP 连接 AI 客户端。
+
+[下载 Windows 安装版](https://github.com/chopinone/StructBoard/releases/latest) · [观看 30 秒演示](https://github.com/chopinone/StructBoard/releases/download/v0.3.0/StructBoard-demo-30s.mp4) · [从源码构建](#从源码构建)
+
+[![白色界面动态预览：结构联动与候选排列，点击观看完整视频](docs/images/demo-preview.gif)](https://github.com/chopinone/StructBoard/releases/download/v0.3.0/StructBoard-demo-30s.mp4)
+
+*上方为无声片段；点击观看带中文配音的 30 秒完整视频。画面使用虚构的 NOVA 管线与公开示例结构，不包含个人研究数据。*
+
+## 一眼看懂设计路线
+
+把步骤与连线放在一张地图上，随手调整节点位置和连线，也可一键自动整理。从路线节点直接定位到结构。
+
+![完整路线地图：从生成设计到结构复核](docs/images/route-map.png)
+
+## 把候选放在一起比较
+
+多个模型并排查看、结构对齐、视角联动。按候选分组或逐个平铺，星标和参考结构保留在当前工作区。
+
+![两个演示候选的十个模型按候选排列](docs/images/model-comparison.png)
+
+## 总览与检阅同时进行
+
+左边浏览候选与封面，右边旋转和比较结构。多个管线可分标签管理，也可拆成独立窗口。
+
+![完整分屏界面：左侧总览，右侧结构检阅](docs/images/split-view.png)
+
+## AI 接入当前工作区
+
+通过 MCP 让已授权客户端读取步骤、指标和管线。顶部连接灯显示连接名称与状态；内置助手自动推进只读查询，过程默认折叠，优先给出简短结论。修改数据仍需确认。
+
+![演示助手已连接，顶部显示连接状态](docs/images/ai-connection.png)
+
+图片和视频的素材说明见 [演示素材说明](docs/MEDIA.md)。
 
 ## Windows 安装
 
-适用于 Windows 10/11 x64。下载 GitHub Release 中的 `StructBoard-0.3.0-windows-x64-setup.exe`，安装后打开构境。安装器检查 Microsoft WebView2；缺少时运行包内的微软官方引导安装器，这一步需要联网。
+适用于 Windows 10/11 x64。下载 [StructBoard-0.3.0-windows-x64-setup.exe](https://github.com/chopinone/StructBoard/releases/download/v0.3.0/StructBoard-0.3.0-windows-x64-setup.exe)，安装后打开构境。安装器检查 Microsoft WebView2；缺少时运行包内的微软官方引导安装器，这一步需要联网。
 
-也可下载 `StructBoard-0.3.0-windows-x64.zip`，解压整个文件夹后运行 `StructBoard.exe`。请保留 `backend`、`bootstrap` 和 `manifest.json`；不要只复制一个 EXE。便携版同样需要 Microsoft WebView2 Runtime。
+也可下载 [便携 ZIP](https://github.com/chopinone/StructBoard/releases/download/v0.3.0/StructBoard-0.3.0-windows-x64.zip)，解压整个文件夹后运行 `StructBoard.exe`。请保留 `backend`、`bootstrap` 和 `manifest.json`；不要只复制一个 EXE。便携版同样需要 Microsoft WebView2 Runtime。
 
 普通用户无需安装 Python、Node.js 或 Rust。用户工作区和管线保存在当前用户的 `%APPDATA%\com.structboard.desktop`。安装升级和卸载保留该目录。
 
