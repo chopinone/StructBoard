@@ -1,6 +1,6 @@
 # Third-party notices
 
-First-party StructBoard code is licensed under GPL-3.0-only; see LICENSE. Third-party components retain their original licenses and notices.
+First-party StructBoard code is licensed under the MIT License; see LICENSE. Third-party components retain their original licenses and notices.
 
 | Component | Use | License / notice |
 | --- | --- | --- |

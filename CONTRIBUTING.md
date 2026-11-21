@@ -1,6 +1,6 @@
 # Contributing
 
-Install the prerequisites and follow the build instructions in README.md. Keep regression fixtures artificial and reproducible. Contributions to first-party code are provided under GPL-3.0-only.
+Install the prerequisites and follow the build instructions in README.md. Keep regression fixtures artificial and reproducible. Contributions to first-party code are provided under the MIT License.
 
 Before submitting:
 

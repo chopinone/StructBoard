@@ -53,8 +53,8 @@
     "frontend/views/transcript-tree.mjs": "d888439eb226d3920cd5c30f59b90bb750357903cfbbf57fe906eabce69f3499",
     "frontend/views/transcript.mjs": "8e3c686d4d895834c85961175320c1d66f667f8e19a4c356dd9f9b6ebb74a4df",
     "frontend/vite.config.mjs": "00edf86999b3acc95fd11de5646c35194f54d900ae2f0b4b4ff5b978690eff70",
-    "package-lock.json": "f4e93b34a637f4f8b4dd49e812ae379b49a1ff387fceb5c41e70a70e5cd57b9a",
-    "package.json": "3a37965f16d05edb0644e70dbd73976407af7f4f94131e46c85bfdb9d8a55384",
+    "package-lock.json": "6323dafe12bf3d7bf552b2c144ef7ead2a25d0d4ac6d1f8188e2912f5d165dc6",
+    "package.json": "6f551f646ece32208d05e63d58c6a8b2570ee523280d7d616f174c48f5e3a8dd",
     "tools/check_frontend_build.mjs": "682231c8eb5e86a773dbed1f8a6679cc6cc271d09defa99e4c0e9a6c2cf6a9e5"
   },
   "bundle": "dbc6989582c09d13972b74d3772381b91d71bbff8b2bc3874e44bffc7ebb9e1b"

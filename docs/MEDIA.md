@@ -8,4 +8,4 @@ MCP 画面展示外部演示客户端通过 MCP 发起的一次真实只读工�
 
 软件内置的 Aurora 演示另由 `demo_data.py` 完全生成，不需要下载这些公开结构。
 
-演示素材由 chopinone / StructBoard 提供；仓库代码遵循 GPL-3.0-only。第三方结构数据和软件组件保留其原有权利。
+演示素材由 chopinone / StructBoard 提供；当前仓库第一方代码遵循 MIT License。第三方结构数据和软件组件保留其原有权利与许可证。
